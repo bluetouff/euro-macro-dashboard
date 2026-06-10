@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.cache/
+
+# Secrets / env
+.env
+.streamlit/secrets.toml
+
+# Données générées (snapshot.js est commité comme démo ; le json est redondant)
+snapshot.json
+snapshots/
+*.csv
+
+# Sauvegardes / divers
+*_backup.py
+app_backup.py
+.DS_Store
+.ipynb_checkpoints/

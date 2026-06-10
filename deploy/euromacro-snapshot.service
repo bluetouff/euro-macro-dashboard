@@ -1,0 +1,34 @@
+# /etc/systemd/system/euromacro-snapshot.service
+#
+# Service "oneshot" : régénère et publie l'instantané.
+# Durci : pas de privilèges, système en lecture seule sauf les 2 dossiers utiles.
+
+[Unit]
+Description=Euro Macro Risk — régénération de l'instantané
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=euromacro
+Group=euromacro
+ExecStart=/opt/euromacro/deploy/refresh.sh
+
+# --- Durcissement ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Seuls dossiers accessibles en écriture :
+ReadWritePaths=/opt/euromacro /var/www/html/euromacro
+# Réseau sortant autorisé (BCE/Eurostat en HTTPS), pas d'écoute entrante.
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+# /etc/systemd/system/euromacro-snapshot.timer
+#
+# Déclenche la régénération chaque jour (les séries BCE/Eurostat sont au mieux
+# quotidiennes). RandomizedDelaySec évite de taper les serveurs à heure fixe.
+# Persistent=true rattrape un déclenchement manqué (machine éteinte).
+
+[Unit]
+Description=Euro Macro Risk — rafraîchissement quotidien de l'instantané
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target
