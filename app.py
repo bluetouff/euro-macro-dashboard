@@ -1,5 +1,5 @@
 """
-Euro Macro Risk Dashboard — tableau de bord style moderne/compact pour la zone euro.
+Euro Macro Risk Dashboard - tableau de bord style moderne/compact pour la zone euro.
 Pendant européen de la version US (FRED -> ECB Data Portal + Eurostat).
 
 Lancement :  streamlit run app.py
@@ -18,7 +18,7 @@ from catalog import (
 from data import (
     fetch_all_series, compute_dashboard, compute_predictive_power,
     apply_weights, family_scores, global_score, reconstruct_historical_score,
-    status_emoji, status_color, regime_from_score,
+    status_emoji, regime_from_score,
 )
 
 # ============================================================
@@ -31,23 +31,44 @@ st.set_page_config(page_title="Euro Macro Risk", page_icon="🇪🇺",
 st.markdown("""
 <style>
   :root{
-    --bg:#0a0a0c; --panel:#131316; --panel2:#17171b; --line:#23232a;
-    --txt:#e9e9ec; --mut:#7c7c86; --accent:#f5a623; --accent2:#3da8ff;
-    --ok:#2fbf71; --warn:#f5a623; --dang:#ff4d4f;
+    --bg:#1a1a1a; --panel:#202020; --panel2:#171717;
+    --line:rgba(0,240,208,.16); --line-soft:rgba(255,255,255,.10);
+    --txt:#b8fff5; --paper:#e7e9ee; --bright:#f5f6f8;
+    --mut:#6f9b94; --faint:#456b65; --accent:#00f0d0; --teal:#5eead4;
+    --yen:#ff6b9d; --rose:#ff4d87; --gold:#f5b13d; --orange:#ff8a3d;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   }
-  .stApp{background:var(--bg); color:var(--txt);
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;}
-  .block-container{padding-top:2.2rem; padding-bottom:2rem; max-width:1500px;}
-  #MainMenu,footer,header{visibility:hidden;}
-  h1,h2,h3{font-family:inherit; letter-spacing:-.01em;}
+  .stApp{background:radial-gradient(1100px 520px at 50% -8%,rgba(94,234,212,.05),transparent 62%),var(--bg);
+    color:var(--txt);font-family:var(--mono);}
+  .stApp::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.08) 3px);
+    mix-blend-mode:multiply;opacity:.42;}
+  .block-container{padding-top:1.2rem; padding-bottom:2rem; max-width:1220px;}
+  #MainMenu,footer{visibility:hidden;}
+  h1,h2,h3{color:var(--bright);font-family:var(--mono);letter-spacing:0;}
   .stProgress > div > div{background:var(--accent);}
   hr{border-color:var(--line);}
+  .tape{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px 22px;border-bottom:1px solid var(--line);
+    padding-bottom:14px;margin-bottom:20px;}
+  .brand{color:var(--bright);font-size:1.15rem;font-weight:800;}
+  .brand b{color:var(--yen);}
+  .tagline{color:var(--mut);font-size:.72rem;letter-spacing:.03em;}
+  .top-nav{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto;align-items:center;}
+  .nav-link{color:var(--mut) !important;border:1px solid var(--line);border-radius:999px;padding:4px 10px;
+    font-size:.7rem;text-decoration:none !important;}
+  .nav-link:hover,.nav-link.active{color:var(--bright) !important;border-color:rgba(94,234,212,.65);
+    background:rgba(94,234,212,.06);}
+  .status-pill{color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:4px 10px;
+    font-size:.7rem;display:flex;gap:8px;align-items:center;}
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
 
   /* ---- hero ---- */
-  .title{font-size:24px;font-weight:800;margin:0;}
-  .sub{color:var(--mut);font-size:12px;margin-top:2px;}
-  .hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:16px 0 4px;}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .title{font-size:24px;font-weight:800;margin:0;color:var(--bright);border-bottom:1px solid var(--line);
+    padding-bottom:8px;text-shadow:0 0 30px rgba(94,234,212,.18);}
+  .sub{color:var(--mut);font-size:12px;margin-top:9px;line-height:1.5;}
+  .hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:18px 0 16px;}
+  .stat{background:var(--panel);border:0;border-left:3px solid var(--accent);border-radius:0;padding:15px 16px;min-height:112px;}
   .stat .lab{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;}
   .stat .big{font-size:34px;font-weight:800;font-family:'SF Mono',ui-monospace,monospace;line-height:1.1;margin-top:2px;}
   .stat .big small{font-size:14px;color:var(--mut);font-weight:600;}
@@ -56,23 +77,23 @@ st.markdown("""
 
   /* ---- section header ---- */
   .sec{display:flex;align-items:center;gap:10px;margin:20px 0 10px;}
-  .sec .ic{font-size:15px;}
-  .sec .nm{font-size:13px;font-weight:700;color:#cfcfd6;text-transform:uppercase;letter-spacing:.06em;}
+  .sec .ic{font-size:13px;color:var(--yen);}
+  .sec .nm{font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;}
   .sec .ln{flex:1;height:1px;background:var(--line);}
   .sec .bd{font-family:'SF Mono',ui-monospace,monospace;font-size:12px;font-weight:700;
     padding:2px 9px;border-radius:999px;}
 
   /* ---- tiles grid ---- */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;}
-  .tile{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;
     padding:11px 13px 10px;position:relative;overflow:hidden;transition:.15s;}
-  .tile:hover{border-color:#34343d;background:var(--panel2);}
+  .tile:hover{border-color:rgba(94,234,212,.65);background:var(--panel2);}
   .tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);}
   .tile .nm{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;
     line-height:1.25;min-height:25px;display:flex;align-items:flex-start;gap:5px;}
   .tile .nm .d{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none;margin-top:3px;}
   .tile .vl{font-size:21px;font-weight:700;font-family:'SF Mono',ui-monospace,monospace;
-    color:#fff;line-height:1.1;margin-top:5px;}
+    color:var(--bright);line-height:1.1;margin-top:5px;}
   .tile .vl u{font-size:11px;color:var(--mut);font-weight:600;text-decoration:none;margin-left:3px;}
   .tile .mt{font-size:10px;font-family:'SF Mono',ui-monospace,monospace;color:var(--mut);margin-top:4px;}
   .tile .mt b{color:var(--c);font-weight:700;}
@@ -80,10 +101,30 @@ st.markdown("""
   /* ---- alerts strip ---- */
   .alerts{display:flex;flex-wrap:wrap;gap:7px;}
   .al{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
-    border-left:3px solid var(--c);border-radius:9px;padding:7px 11px;}
-  .al .an{font-size:11px;color:#d7d7dc;font-weight:600;}
+    border-left:3px solid var(--c);border-radius:8px;padding:7px 11px;}
+  .al .an{font-size:11px;color:var(--paper);font-weight:600;}
   .al .av{font-family:'SF Mono',ui-monospace,monospace;font-size:12px;color:var(--c);font-weight:700;}
   .muted{color:var(--mut);font-size:11px;}
+  .help-card{background:rgba(255,255,255,.018);border:1px solid var(--line);border-left:2px solid var(--teal);
+    border-radius:8px;padding:13px 15px;color:var(--mut);font-size:.82rem;line-height:1.55;margin:8px 0 14px;}
+  .help-card strong{color:var(--paper);}
+  .faq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:10px 0 18px;}
+  .faq-card{background:rgba(255,255,255,.018);border:1px solid var(--line);border-radius:8px;
+    padding:14px 15px;min-height:128px;color:var(--mut);font-size:.82rem;line-height:1.52;}
+  .faq-card strong{color:var(--paper);display:block;margin-bottom:6px;}
+  .site-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:34px;padding:18px 0 6px;border-top:1px solid var(--line);color:var(--faint);font-size:.72rem;}
+  .l0g-logo{display:inline-flex;align-items:baseline;gap:2px;color:var(--bright) !important;font-weight:800;text-decoration:none !important;letter-spacing:0;}
+  .l0g-logo .slash{color:var(--teal);}
+  .l0g-logo:hover{color:var(--teal) !important;}
+  .stExpander{border-color:var(--line) !important;}
+  @media (max-width:1180px){
+    .hero,.faq-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width:720px){
+    .hero,.faq-grid{grid-template-columns:1fr;}
+    .top-nav{margin-left:0;}
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,11 +149,139 @@ def fmt(v, unit=""):
     return f"{s}<u>{unit}</u>" if unit else s
 
 
+THEME_STATUS_COLORS = {
+    "ok": "#5eead4",
+    "warning": "#f5b13d",
+    "danger": "#ff4d87",
+    "unknown": "#456b65",
+}
+THEME_REGIME_COLORS = {
+    "Risk-On / Expansion": "#5eead4",
+    "Neutre": "#6f9b94",
+    "Prudence / Récession Watch": "#f5b13d",
+    "Risk-Off / Stress élevé": "#ff4d87",
+    "Indéterminé": "#456b65",
+}
+
+
+def query_value(name: str, default: str = "") -> str:
+    value = st.query_params.get(name, default)
+    if isinstance(value, list):
+        return str(value[0]) if value else default
+    return str(value)
+
+
+def current_view() -> str:
+    view = query_value("view", "radar").lower()
+    return "faq" if view in {"faq", "help", "aide"} else "radar"
+
+
+def themed_status_color(status: str) -> str:
+    return THEME_STATUS_COLORS.get(status, THEME_STATUS_COLORS["unknown"])
+
+
+def themed_regime(score: float) -> tuple[str, str]:
+    label, _ = regime_from_score(score)
+    return label, THEME_REGIME_COLORS.get(label, THEME_STATUS_COLORS["unknown"])
+
+
+def render_header(view: str, timestamp: str | None = None) -> None:
+    radar_active = "active" if view == "radar" else ""
+    faq_active = "active" if view == "faq" else ""
+    status = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M")
+    st.markdown(
+        f"""
+        <header class="tape">
+            <div class="brand"><b>Euro</b> Macro <b>Risk</b></div>
+            <div class="tagline">Zone euro EA20 · BCE · Eurostat · cycle · stress macro</div>
+            <nav class="top-nav" aria-label="Navigation">
+                <a class="nav-link {radar_active}" href="?">Radar</a>
+                <a class="nav-link {faq_active}" href="?view=faq">Aide / FAQ</a>
+            </nav>
+            <div class="status-pill"><span class="status-dot"></span>{status}</div>
+        </header>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_site_footer() -> None:
+    st.markdown(
+        """
+        <div class="site-footer">
+          <a class="l0g-logo" href="https://l0g.fr" target="_blank" rel="noopener" aria-label="l0g.fr">
+            <span class="slash">//</span><span>l0g.fr</span>
+          </a>
+          <span>Euro Macro Risk · MIT License</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_faq_page() -> None:
+    st.markdown("<div class='title'>Aide / FAQ</div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="help-card">
+          <strong>Objectif.</strong> Euro Macro Risk agrège des séries publiques BCE et Eurostat
+          pour surveiller le régime macro de la zone euro. L'outil ne prédit pas une récession
+          et ne donne pas de conseil d'investissement : il aide à savoir quels canaux lire en premier.
+        </div>
+        <div class="faq-grid">
+          <div class="faq-card"><strong>Périmètre</strong> Le dashboard suit la zone euro, principalement EA20, avec des séries monétaires, souveraines, inflation, emploi, crédit, activité, corporate et immobilier.</div>
+          <div class="faq-card"><strong>Score 0-100</strong> Le score combine les indicateurs disponibles, pondérés par leur pouvoir prédictif historique face aux récessions CEPR. Plus le score monte, plus le régime est tendu.</div>
+          <div class="faq-card"><strong>Sources</strong> Les données viennent de sources publiques et gratuites : ECB Data Portal, Eurostat et datation CEPR-EABCN pour les récessions de la zone euro.</div>
+          <div class="faq-card"><strong>Lecture</strong> Le score global compte moins que sa composition : il faut regarder si la tension vient des taux, du souverain, du crédit, de l'activité réelle ou du stress systémique.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("Que mesure exactement le radar ?", expanded=True):
+        st.markdown(
+            """
+            Chaque série est comparée à son régime récent via un z-score orienté risque.
+            Une valeur élevée n'est pas toujours un risque : certaines séries deviennent risquées
+            quand elles baissent, comme la pente de courbe ou la monnaie réelle.
+            """
+        )
+    with st.expander("Pourquoi remplacer le PMI ?"):
+        st.markdown(
+            """
+            Le PMI est propriétaire. Le dashboard utilise donc l'ESI et d'autres séries Eurostat
+            ou BCE qui sont publiques, vérifiables et réutilisables sans clé.
+            """
+        )
+    with st.expander("Comment lire les couleurs ?"):
+        st.markdown(
+            """
+            Vert signifie zone normale, jaune tension et rouge alerte, selon l'écart à la moyenne
+            mobile 5 ans dans le sens du risque. La couleur est un signal de tri, pas une conclusion
+            macro définitive.
+            """
+        )
+    with st.expander("Quelles limites garder en tête ?"):
+        st.markdown(
+            """
+            Certaines séries sont révisées, publiées avec retard ou indisponibles temporairement.
+            Le diagnostic liste les séries ignorées afin de garder une lecture transparente.
+            """
+        )
+
+
+view = current_view()
+render_header(view)
+if view == "faq":
+    render_faq_page()
+    render_site_footer()
+    st.stop()
+
+
 with st.spinner("Connexion BCE & Eurostat…"):
     raw, errors, dashboard, power, hist = load_everything()
 
 g_score = global_score(dashboard)
-regime_label, regime_col = regime_from_score(g_score)
+regime_label, regime_col = themed_regime(g_score)
 fam = family_scores(dashboard)
 n_ok = sum(1 for d in dashboard.values() if d["status"] == "ok")
 n_warn = sum(1 for d in dashboard.values() if d["status"] == "warning")
@@ -125,24 +294,24 @@ ciss = dashboard.get("CISS")
 # ============================================================
 
 st.markdown(
-    f"<div class='title'>🇪🇺 Euro Macro Risk</div>"
+    f"<div class='title'>Euro Macro Risk</div>"
     f"<div class='sub'>BCE + Eurostat · {len(dashboard)} indicateurs · "
     f"MAJ {datetime.now():%d %b %Y %H:%M} · backtest récessions CEPR</div>",
     unsafe_allow_html=True)
 
 ciss_html = ""
 if ciss:
-    ciss_html = (f"<div class='big' style='color:{status_color(ciss['status'])}'>"
+    ciss_html = (f"<div class='big' style='color:{themed_status_color(ciss['status'])}'>"
                  f"{ciss['current']:.3f} {status_emoji(ciss['status'])}</div>")
 st.markdown(
     f"<div class='hero'>"
-    f"<div class='stat'><div class='lab'>Score de risque global</div>"
+    f"<div class='stat' style='border-left-color:{regime_col}'><div class='lab'>Score de risque global</div>"
     f"<div class='big' style='color:{regime_col}'>{g_score:g}<small>/100</small></div></div>"
-    f"<div class='stat'><div class='lab'>Régime macro</div>"
+    f"<div class='stat' style='border-left-color:{regime_col}'><div class='lab'>Régime macro</div>"
     f"<span class='pill' style='background:{regime_col}22;color:{regime_col};"
     f"border:1px solid {regime_col}55'>{regime_label}</span></div>"
-    f"<div class='stat'><div class='lab'>CISS · stress systémique BCE</div>{ciss_html}</div>"
-    f"<div class='stat'><div class='lab'>État des {len(dashboard)} indicateurs</div>"
+    f"<div class='stat' style='border-left-color:{themed_status_color(ciss['status']) if ciss else '#456b65'}'><div class='lab'>CISS · stress systémique BCE</div>{ciss_html}</div>"
+    f"<div class='stat' style='border-left-color:#5eead4'><div class='lab'>État des {len(dashboard)} indicateurs</div>"
     f"<div class='dots'>🟢 {n_ok}&nbsp;&nbsp;🟡 {n_warn}&nbsp;&nbsp;🔴 {n_dang}</div></div>"
     f"</div>", unsafe_allow_html=True)
 
@@ -153,7 +322,7 @@ with cc2:
 with cc1:
     with st.expander("ℹ️  Comment lire ce tableau de bord"):
         st.markdown("""
-**Score global 0-100** — agrégation pondérée par *pouvoir prédictif* (corrélation historique
+**Score global 0-100** : agrégation pondérée par *pouvoir prédictif* (corrélation historique
 aux récessions **CEPR**). 🟩 <45 Risk-On · ⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 >70 Stress.
 
 **Couleur d'un indicateur** = *z-score signé* (écart à sa moyenne 5 ans, orienté risque) :
@@ -180,14 +349,14 @@ st.markdown("<div class='sec'><span class='ic'>⚠️</span>"
 if alerts:
     chips = ""
     for code, d in alerts:
-        ccol = status_color(d["status"])
+        ccol = themed_status_color(d["status"])
         z = d.get("signed_z", float("nan"))
         chips += (f"<div class='al' style='--c:{ccol}'>{status_emoji(d['status'])}"
                   f"<span class='an'>{d['meta']['name']}</span>"
                   f"<span class='av'>{d['current']:,.2f} · z{z:+.1f}</span></div>")
     st.markdown(f"<div class='alerts'>{chips}</div>", unsafe_allow_html=True)
 else:
-    st.markdown("<span class='muted'>✓ Aucun signal d'alerte — tous les indicateurs "
+    st.markdown("<span class='muted'>✓ Aucun signal d'alerte : tous les indicateurs "
                 "sont dans leur zone normale.</span>", unsafe_allow_html=True)
 
 
@@ -199,9 +368,9 @@ with st.expander("📈  Score composite historique vs récessions (CEPR)", expan
     if len(hist) > 12:
         fig = go.Figure()
         for s0, s1 in EURO_RECESSION_PERIODS:
-            fig.add_vrect(x0=s0, x1=s1, fillcolor="#ff4d4f", opacity=0.15, line_width=0)
+            fig.add_vrect(x0=s0, x1=s1, fillcolor="#ff4d87", opacity=0.15, line_width=0)
         fig.add_trace(go.Scatter(x=hist.index, y=hist.values, mode="lines",
-                                 line=dict(color="#f5a623", width=2)))
+                                 line=dict(color="#5eead4", width=2)))
         fig.add_hline(y=55, line=dict(color="#666", width=1, dash="dot"))
         fig.update_layout(height=240, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                           font=dict(color="#9a9aa2", family="SF Mono"),
@@ -217,7 +386,7 @@ with st.expander("📈  Score composite historique vs récessions (CEPR)", expan
 
 
 # ============================================================
-# MUR D'INDICATEURS — grille dense (vue par défaut)
+# MUR D'INDICATEURS - grille dense (vue par défaut)
 # ============================================================
 
 def sparkline(series, color):
@@ -239,7 +408,7 @@ if not details:
         if not active:
             continue
         sc, n = fam.get(family, (np.nan, 0))
-        _, bcol = regime_from_score(sc)
+        _, bcol = themed_regime(sc)
         html += (f"<div class='sec'><span class='ic'>{FAMILY_ICONS.get(family,'•')}</span>"
                  f"<span class='nm'>{FAMILY_LABELS.get(family,family)}</span>"
                  f"<span class='ln'></span>"
@@ -247,7 +416,7 @@ if not details:
         tiles = ""
         for code, meta in active:
             d = dashboard[code]
-            ccol = status_color(d["status"])
+            ccol = themed_status_color(d["status"])
             unit = meta.get("unit", "")
             z = d.get("signed_z", np.nan)
             m1 = d.get("mom_1y", np.nan)
@@ -275,7 +444,7 @@ else:
         cols = st.columns(min(4, len(active)))
         for i, (code, meta) in enumerate(active):
             d = dashboard[code]
-            ccol = status_color(d["status"])
+            ccol = themed_status_color(d["status"])
             with cols[i % len(cols)]:
                 unit = meta.get("unit", "")
                 sub = []
@@ -304,9 +473,11 @@ with st.expander("⚙️  Diagnostic des sources"):
                 f"({all_series_count()} au catalogue)")
     if errors:
         for code, msg in errors.items():
-            st.markdown(f"- `{code}` — {msg}")
+            st.markdown(f"- `{code}` : {msg}")
         st.caption("Ajuste la clé/les filtres dans `catalog.py` si besoin.")
     else:
         st.success("Toutes les séries du catalogue ont été récupérées.")
     st.caption("© European Central Bank (ECB Data Portal) & Eurostat · CISS © ECB · "
                "récessions CEPR-EABCN.")
+
+render_site_footer()
