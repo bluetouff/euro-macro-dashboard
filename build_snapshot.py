@@ -13,7 +13,7 @@ Usage :  python build_snapshot.py
 
 import json
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -28,6 +28,11 @@ from data import (
 )
 
 SPARK_POINTS = 48   # points conservés pour les mini-courbes
+
+
+def _generated_at():
+    """Timestamp UTC explicite pour les consommateurs machine."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _num(x):
@@ -115,7 +120,7 @@ def build():
                 for ts, v in hist.items() if _num(v) is not None]
 
     snap = {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": _generated_at(),
         "global_score": _num(g),
         "regime": {"label": label, "color": color},
         "counts": counts,
