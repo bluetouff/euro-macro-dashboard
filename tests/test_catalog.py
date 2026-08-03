@@ -19,7 +19,10 @@ class CatalogContractTest(unittest.TestCase):
         self.assertEqual(stress["CISS_BM"]["key"], "CISS.D.U2.Z0Z.4F.EC.SS_BMN.CON")
 
     def test_visible_catalog_has_expected_size(self):
-        self.assertGreaterEqual(visible_series_count(), 30)
+        self.assertEqual(visible_series_count(), 32)
+
+    def test_unavailable_bankruptcy_series_is_not_in_catalog(self):
+        self.assertNotIn("BANKRUPT", SERIES_CATALOG["credit_banques"])
 
 
 if __name__ == "__main__":
