@@ -13,6 +13,7 @@ venv/
 snapshot.json
 snapshots/
 *.csv
+DEPLOYED_SHA
 
 # Sauvegardes / divers
 *_backup.py

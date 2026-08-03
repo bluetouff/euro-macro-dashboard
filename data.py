@@ -9,7 +9,7 @@ Moteur de scoring (identique à la version US) :
   - baseline pré-Covid (2015-2019)
   - z-score sur fenêtre glissante 5 ans (orienté par `direction`)
   - drift (écart vs baseline) + momentum (variations 3M / 1A)
-  - pondération hiérarchique calibrée par "pouvoir prédictif" (corrélation aux récessions CEPR)
+  - pondération hiérarchique heuristique (corrélation historique aux récessions CEPR à +6 mois)
   - score global 0-100 + reconstruction historique
 """
 
@@ -22,6 +22,7 @@ from catalog import (
     SERIES_CATALOG, PRE_COVID_START, PRE_COVID_END,
     ZSCORE_WINDOW_YEARS, ZSCORE_WARNING, ZSCORE_DANGER,
     EURO_RECESSION_PERIODS, REGIME_CHANGE_SERIES, NO_MOMENTUM_SERIES,
+    FRESHNESS_DAYS,
 )
 
 EUROSTAT_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
@@ -36,7 +37,7 @@ def _fetch_eurostat_sdmx(dataset, key, start=START):
     donc pas d'explosion dimensionnelle, pas de 413, pas de réponse vide.
     Essaie plusieurs variantes de format CSV (l'endpoint sert vnd.sdmx.data+csv ;
     un Accept restrictif déclenche un 406, on laisse donc `format=` piloter).
-    Ex. dataset='une_rt_m', key='M.SA.TOTAL.PC_ACT.T.EA20'.
+    Ex. dataset='une_rt_m', key='M.SA.TOTAL.PC_ACT.T.EA21'.
     """
     from io import StringIO
     last_err = None
@@ -226,7 +227,29 @@ def _fetch_eurostat(dataset, filters, start=START):
     return s
 
 
-def fetch_all_series(progress=None):
+def _normalized_day(value=None):
+    """Retourne un Timestamp UTC sans timezone, normalisé au jour."""
+    ts = pd.Timestamp.now(tz="UTC") if value is None else pd.Timestamp(value)
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert("UTC").tz_localize(None)
+    return ts.normalize()
+
+
+def _freshness_error(series, meta, as_of=None):
+    """Décrit une série périmée, ou renvoie None si elle est assez récente."""
+    if series is None or len(series) == 0:
+        return "réponse vide"
+    last = _normalized_day(series.index[-1])
+    today = _normalized_day(as_of)
+    age = max(0, (today - last).days)
+    limit = int(meta.get("max_age_days", FRESHNESS_DAYS.get(meta.get("freq", "M"), 105)))
+    if age > limit:
+        return (f"périmée : dernière observation {last.date().isoformat()} "
+                f"({age} jours, limite {limit})")
+    return None
+
+
+def fetch_all_series(progress=None, as_of=None):
     """
     Récupère toutes les séries du catalogue.
     Retourne dict {code: pd.Series}. Les séries en erreur sont ignorées
@@ -253,13 +276,19 @@ def fetch_all_series(progress=None):
                 if meta.get("yoy"):
                     s = _to_yoy(s, meta.get("freq", "M"))
                 if s is not None and len(s) >= 10:
-                    raw[code] = s
+                    stale = _freshness_error(s, meta, as_of=as_of)
+                    if stale:
+                        errors[code] = stale
+                    else:
+                        raw[code] = s
                 else:
                     errors[code] = "trop court après calcul YoY"
             elif s is not None:
                 errors[code] = f"seulement {len(s)} obs (filtres/clé à vérifier)"
             else:
-                errors[code] = "réponse vide — vérifier dimensions (geo/unit/s_adj)"
+                errors[code] = meta.get(
+                    "empty_message", "réponse vide — vérifier dimensions (geo/unit/s_adj)"
+                )
         except Exception as e:  # noqa: BLE001 — robustesse: on saute la série
             errors[code] = str(e)[:140]
 
@@ -272,7 +301,16 @@ def fetch_all_series(progress=None):
                 if a in raw and b in raw:
                     aligned = ((raw[a] - raw[b]) * scale).dropna()
                     if len(aligned) >= 10:
-                        raw[code] = aligned
+                        stale = _freshness_error(aligned, meta, as_of=as_of)
+                        if stale:
+                            errors[code] = stale
+                        else:
+                            raw[code] = aligned
+                    else:
+                        errors[code] = "trop court après calcul des composantes"
+                else:
+                    missing = ", ".join(c for c in (a, b) if c not in raw)
+                    errors[code] = f"composante indisponible : {missing}"
 
     if progress:
         progress(1.0, "terminé")
@@ -289,7 +327,26 @@ def _to_yoy(s, freq="M"):
 # MÉTRIQUES PAR SÉRIE
 # ============================================================
 
-def compute_metrics(data, direction="up", with_momentum=True):
+def _calendar_change(data, target_date, mode="delta"):
+    """Variation vers la dernière observation connue à la date cible ou avant."""
+    past = data.loc[:target_date]
+    if len(past) == 0:
+        return np.nan
+    current = float(data.iloc[-1])
+    previous = float(past.iloc[-1])
+    if mode == "relative":
+        return ((current - previous) / abs(previous) * 100) if previous else np.nan
+    return current - previous
+
+
+def _momentum_unit(unit, mode):
+    if mode == "relative":
+        return "%"
+    return {"%": "pp", "idx": "pt", "pts": "pt", "bal": "pt"}.get(unit, unit or "pt")
+
+
+def compute_metrics(data, direction="up", with_momentum=True,
+                    momentum_mode="delta", unit=""):
     """Calcule current / baseline / z-score / drift / momentum / statut."""
     if data is None or len(data) < 10:
         return None
@@ -318,14 +375,10 @@ def compute_metrics(data, direction="up", with_momentum=True):
     else:
         status = "ok"
 
-    def _pct(n):
-        if len(data) <= n:
-            return np.nan
-        past = data.iloc[-1 - n]
-        return ((current - past) / abs(past) * 100) if past else np.nan
-
-    mom_3m = _pct(3) if with_momentum else np.nan
-    mom_1y = _pct(12) if with_momentum else np.nan
+    mom_3m = (_calendar_change(data, current_date - pd.DateOffset(months=3), momentum_mode)
+              if with_momentum else np.nan)
+    mom_1y = (_calendar_change(data, current_date - pd.DateOffset(years=1), momentum_mode)
+              if with_momentum else np.nan)
 
     return {
         "current": current,
@@ -336,6 +389,7 @@ def compute_metrics(data, direction="up", with_momentum=True):
         "drift": (current - baseline) if not np.isnan(baseline) else np.nan,
         "mom_3m": mom_3m,
         "mom_1y": mom_1y,
+        "mom_unit": _momentum_unit(unit, momentum_mode),
         "status": status,
         "history": data,
     }
@@ -353,6 +407,8 @@ def compute_dashboard(raw):
                 direction=meta.get("direction", "up"),
                 with_momentum=code not in NO_MOMENTUM_SERIES
                 and code not in REGIME_CHANGE_SERIES,
+                momentum_mode=meta.get("momentum", "delta"),
+                unit=meta.get("unit", ""),
             )
             out[code]["family"] = family
             out[code]["meta"] = meta
@@ -373,8 +429,9 @@ def _recession_dummy(index):
 
 def compute_predictive_power(raw):
     """
-    Pour chaque série, |corrélation| entre son z-score glissant (orienté risque)
-    et un indicateur de récession CEPR avancé de 6 mois.
+    Pour chaque série, |corrélation| entre son z-score glissant mensuel (orienté
+    risque) et l'état de récession CEPR six mois plus tard. Il s'agit d'une
+    heuristique descriptive sur échantillon complet, pas d'une validation prospective.
     Renvoie dict {code: power in [0,1]}.
     """
     power = {}
@@ -382,7 +439,10 @@ def compute_predictive_power(raw):
         for code, meta in fam.items():
             if code not in raw:
                 continue
-            s = raw[code]
+            # Toutes les séries passent sur une grille mensuelle avant le
+            # backtest : 60 observations = 5 ans et le lead = 6 mois, quelle
+            # que soit leur fréquence native.
+            s = raw[code].resample("MS").last().dropna()
             # z-score glissant 5 ans
             roll = s.rolling(60, min_periods=12)
             z = (s - roll.mean()) / roll.std()
@@ -403,7 +463,7 @@ def compute_predictive_power(raw):
 
 
 def power_to_weight(power):
-    """Mappe le pouvoir prédictif vers un poids à 3 paliers (comme la version US)."""
+    """Mappe la corrélation historique vers un poids heuristique à 3 paliers."""
     if power >= 0.5:
         return 3.0   # signal fort -> tier 1
     if power >= 0.3:
@@ -412,7 +472,7 @@ def power_to_weight(power):
 
 
 def apply_weights(dashboard, power):
-    """Attribue à chaque série un poids basé sur son pouvoir prédictif."""
+    """Attribue à chaque série un poids basé sur la corrélation historique."""
     for code, d in dashboard.items():
         d["power"] = power.get(code, 0.3)
         d["weight"] = power_to_weight(d["power"])
@@ -450,7 +510,7 @@ def family_scores(dashboard):
 
 
 def global_score(dashboard):
-    """Score de risque global 0-100 (pondéré par pouvoir prédictif)."""
+    """Score de risque global 0-100 (pondération heuristique documentée)."""
     num = den = 0.0
     for code, d in dashboard.items():
         sc = _status_score(d)

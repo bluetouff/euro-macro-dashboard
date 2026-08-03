@@ -26,6 +26,13 @@ ProtectKernelTunables=true
 RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
+MemoryDenyWriteExecute=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0022
 # Seuls dossiers accessibles en écriture :
 ReadWritePaths=/opt/euromacro /var/www/html/euromacro
 # Réseau sortant autorisé (BCE/Eurostat en HTTPS), pas d'écoute entrante.

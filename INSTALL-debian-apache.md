@@ -7,7 +7,8 @@ Architecture retenue (la plus sûre) :
 
 ```
 /opt/euromacro/         ← code + venv Python   (JAMAIS servi par Apache)
-   catalog.py  data.py  build_snapshot.py  requirements.txt  index.html
+   catalog.py  data.py  build_snapshot.py  validate_snapshot.py
+   snapshot_contract.py  requirements-prod.txt  index.html  DEPLOYED_SHA
    deploy/...            (confs systemd/apache, refresh.sh)
    .venv/
 
@@ -50,13 +51,15 @@ sudo mkdir -p /opt/euromacro /var/www/html/euromacro
 ## 2. Déposer le code
 
 Copiez le contenu du projet dans `/opt/euromacro` (via `scp`, `git clone`, `rsync`…).
-Vous devez y retrouver `catalog.py`, `data.py`, `build_snapshot.py`, `requirements.txt`,
-`index.html` et le dossier `deploy/`.
+Vous devez y retrouver `catalog.py`, `data.py`, `build_snapshot.py`,
+`snapshot_contract.py`, `validate_snapshot.py`, `requirements-prod.txt`, `index.html`
+et le dossier `deploy/`. Écrivez ensuite le SHA Git exact du code copié.
 
 ```bash
 # exemple depuis votre poste :
 # rsync -av euro_macro_dashboard/ user@serveur:/tmp/euromacro/
 sudo rsync -a /tmp/euromacro/ /opt/euromacro/
+printf '%s\n' 'REMPLACER_PAR_LE_SHA_GIT_40_CARACTERES' | sudo tee /opt/euromacro/DEPLOYED_SHA
 sudo chown -R euromacro:euromacro /opt/euromacro
 ```
 
@@ -67,20 +70,17 @@ sudo chown -R euromacro:euromacro /opt/euromacro
 ```bash
 sudo -u euromacro python3 -m venv /opt/euromacro/.venv
 sudo -u euromacro /opt/euromacro/.venv/bin/pip install --upgrade pip
-sudo -u euromacro /opt/euromacro/.venv/bin/pip install -r /opt/euromacro/requirements.txt
+sudo -u euromacro /opt/euromacro/.venv/bin/pip install -r /opt/euromacro/requirements-prod.txt
 ```
 
 > La version web n'a besoin que de `pandas`, `numpy`, `requests` (présents dans
-> `requirements.txt`). Streamlit/plotly ne servent qu'à l'app interactive locale.
+> `requirements-prod.txt`). Streamlit/plotly ne servent qu'à l'app interactive locale.
 
 ---
 
 ## 4. Web root statique
 
 ```bash
-# La page (statique) va dans le web root ; le code reste dans /opt
-sudo cp /opt/euromacro/index.html /var/www/html/euromacro/index.html
-
 # Droits : propriété euromacro, lecture pour Apache (www-data via "others")
 sudo chown -R euromacro:www-data /var/www/html/euromacro
 sudo find /var/www/html/euromacro -type d -exec chmod 755 {} \;
@@ -96,9 +96,9 @@ sudo chmod +x /opt/euromacro/deploy/refresh.sh
 sudo -u euromacro /opt/euromacro/deploy/refresh.sh
 ```
 
-Vous devez voir un message du type `OK — N indicateurs · score XX · 0 série(s) en erreur`
-puis `Publié dans /var/www/html/euromacro`. Le fichier `/var/www/html/euromacro/snapshot.js`
-est alors créé.
+Vous devez voir la validation du contrat, puis `Publié dans /var/www/html/euromacro` avec
+le SHA attendu. Le script publie `index.html`, `snapshot.js` et `snapshot.json`. Si le build
+ou la promotion échoue, il ne remplace pas le lot public valide.
 
 > **Pare-feu / proxy** : la machine doit pouvoir joindre en sortie HTTPS (443)
 > `data-api.ecb.europa.eu` et `ec.europa.eu`. Aucun port entrant n'est requis pour le build.
@@ -170,6 +170,9 @@ curl -I https://VOTRE-DOMAINE.fr/snapshot.json    # 200 (donnée publique, OK)
 
 # En-têtes de sécurité présents
 curl -sI https://VOTRE-DOMAINE.fr/ | grep -iE 'content-security|x-content|x-frame|referrer'
+
+# Le snapshot public expose le SHA exact et son état de qualité
+curl -fsS https://VOTRE-DOMAINE.fr/snapshot.json | python3 -m json.tool | head -40
 ```
 
 Bonnes pratiques complémentaires :
@@ -181,12 +184,19 @@ Bonnes pratiques complémentaires :
 
 ---
 
-## Mettre à jour les données / le code
+## Mettre à jour les données / le code sans casser la production
 
-- **Données** : automatique via le timer, ou à la demande
+- **Données** : automatique via le timer, ou à la demande avec
   `sudo systemctl start euromacro-snapshot.service`.
-- **Code** (nouvelle série, correctif) : remettre les fichiers dans `/opt/euromacro`,
-  recopier `index.html` vers `/var/www/html/euromacro` si modifié, puis relancer un build.
+- **Code** : préparez ailleurs un checkout propre du SHA à livrer, lancez les tests et un
+  build complet, puis copiez ce checkout dans `/opt/euromacro` en excluant `.git` et `.venv`.
+  Écrivez le même SHA dans `/opt/euromacro/DEPLOYED_SHA`, mettez à jour les dépendances de
+  production et démarrez le service. Ne modifiez pas directement le web root.
+- **Contrôle** : vérifiez le code HTTP, les en-têtes, `generated_at`, `source_sha`,
+  `quality.status` et une série modifiée sur le site public.
+- **Retour arrière** : le dernier lot statique reste dans `/opt/euromacro/.last-good/`.
+  Restaurez aussi le checkout applicatif précédent avant de relancer le service si le code
+  lui-même doit être annulé.
 
 ## Dépannage
 

@@ -13,7 +13,8 @@ from datetime import datetime
 
 from catalog import (
     SERIES_CATALOG, FAMILY_LABELS, FAMILY_ICONS,
-    EURO_RECESSION_PERIODS, all_series_count,
+    EURO_RECESSION_PERIODS, EURO_AREA_SCOPE, all_series_count,
+    visible_series_count,
 )
 from data import (
     fetch_all_series, compute_dashboard, compute_predictive_power,
@@ -193,7 +194,7 @@ def render_header(view: str, timestamp: str | None = None) -> None:
         f"""
         <header class="tape">
             <div class="brand"><b>Euro</b> Macro <b>Risk</b></div>
-            <div class="tagline">Zone euro EA20 · BCE · Eurostat · cycle · stress macro</div>
+            <div class="tagline">{EURO_AREA_SCOPE} · BCE · Eurostat</div>
             <nav class="top-nav" aria-label="Navigation">
                 <a class="nav-link {radar_active}" href="?">Radar</a>
                 <a class="nav-link {faq_active}" href="?view=faq">Aide / FAQ</a>
@@ -229,8 +230,8 @@ def render_faq_page() -> None:
           et ne donne pas de conseil d'investissement : il aide à savoir quels canaux lire en premier.
         </div>
         <div class="faq-grid">
-          <div class="faq-card"><strong>Périmètre</strong> Le dashboard suit la zone euro, principalement EA20, avec des séries monétaires, souveraines, inflation, emploi, crédit, activité, corporate et immobilier.</div>
-          <div class="faq-card"><strong>Score 0-100</strong> Le score combine les indicateurs disponibles, pondérés par leur pouvoir prédictif historique face aux récessions CEPR. Plus le score monte, plus le régime est tendu.</div>
+          <div class="faq-card"><strong>Périmètre</strong> Le dashboard suit la composition courante de la zone euro, soit EA21 depuis le 1er janvier 2026. L'agrégat Eurostat évolutif EA n'est utilisé que lorsque le jeu de données le définit ainsi.</div>
+          <div class="faq-card"><strong>Score 0-100</strong> Le score combine les indicateurs disponibles avec une pondération heuristique fondée sur leur corrélation historique avec l'état de récession CEPR six mois plus tard. Ce n'est pas une validation prospective.</div>
           <div class="faq-card"><strong>Sources</strong> Les données viennent de sources publiques et gratuites : ECB Data Portal, Eurostat et datation CEPR-EABCN pour les récessions de la zone euro.</div>
           <div class="faq-card"><strong>Lecture</strong> Le score global compte moins que sa composition : il faut regarder si la tension vient des taux, du souverain, du crédit, de l'activité réelle ou du stress systémique.</div>
         </div>
@@ -288,6 +289,12 @@ n_warn = sum(1 for d in dashboard.values() if d["status"] == "warning")
 n_dang = sum(1 for d in dashboard.values() if d["status"] == "danger")
 ciss = dashboard.get("CISS")
 
+if errors:
+    st.warning(
+        f"Données dégradées : {len(dashboard)}/{visible_series_count()} indicateurs actifs. "
+        "Les séries absentes ou périmées sont exclues du score et détaillées dans le diagnostic."
+    )
+
 
 # ============================================================
 # HERO (titre + stats clés sur une bande compacte)
@@ -310,7 +317,7 @@ st.markdown(
     f"<div class='stat' style='border-left-color:{regime_col}'><div class='lab'>Régime macro</div>"
     f"<span class='pill' style='background:{regime_col}22;color:{regime_col};"
     f"border:1px solid {regime_col}55'>{regime_label}</span></div>"
-    f"<div class='stat' style='border-left-color:{themed_status_color(ciss['status']) if ciss else '#456b65'}'><div class='lab'>CISS · stress systémique BCE</div>{ciss_html}</div>"
+    f"<div class='stat' style='border-left-color:{themed_status_color(ciss['status']) if ciss else '#456b65'}'><div class='lab'>New CISS · stress systémique BCE</div>{ciss_html}</div>"
     f"<div class='stat' style='border-left-color:#5eead4'><div class='lab'>État des {len(dashboard)} indicateurs</div>"
     f"<div class='dots'>🟢 {n_ok}&nbsp;&nbsp;🟡 {n_warn}&nbsp;&nbsp;🔴 {n_dang}</div></div>"
     f"</div>", unsafe_allow_html=True)
@@ -322,11 +329,13 @@ with cc2:
 with cc1:
     with st.expander("ℹ️  Comment lire ce tableau de bord"):
         st.markdown("""
-**Score global 0-100** : agrégation pondérée par *pouvoir prédictif* (corrélation historique
-aux récessions **CEPR**). 🟩 <45 Risk-On · ⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 >70 Stress.
+**Score global 0-100** : agrégation à pondération heuristique (corrélation historique avec
+l'état de récession **CEPR** à +6 mois, sans validation hors échantillon). 🟩 <45 Risk-On ·
+⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 >70 Stress.
 
 **Couleur d'un indicateur** = *z-score signé* (écart à sa moyenne 5 ans, orienté risque) :
-🟢 normal · 🟡 tension (|z|≥1) · 🔴 alerte (|z|≥2). `z` = z-score · `1A` = variation sur 1 an.
+🟢 normal · 🟡 tension (|z|≥1) · 🔴 alerte (|z|≥2). `z` = z-score · `1A` = variation
+calendaire sur 1 an, en points pour les taux et en % pour les niveaux de marché.
 
 **⏰ Signaux avancés** = indicateurs qui *précèdent* le cycle (pente de courbe, M1 réel, M3,
 anticipations d'emploi). Le PMI étant propriétaire, on utilise l'**ESI** (Commission/Eurostat).
@@ -379,7 +388,8 @@ with st.expander("📈  Score composite historique vs récessions (CEPR)", expan
                           yaxis=dict(gridcolor="#1c1c22", range=[0, 100]))
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("<span class='muted'>Zones rouges = récessions CEPR. Un score >55 "
-                    "avant/pendant ces zones valide le pouvoir d'alerte du composite.</span>",
+                    "avant/pendant ces zones fournit une lecture rétrospective, pas une "
+                    "validation prospective.</span>",
                     unsafe_allow_html=True)
     else:
         st.info("Historique insuffisant pour reconstruire le score.")
@@ -422,11 +432,11 @@ if not details:
             m1 = d.get("mom_1y", np.nan)
             mt = f"<b>z {z:+.2f}</b>" if not np.isnan(z) else ""
             if not np.isnan(m1):
-                mt += f" · 1A {m1:+.0f}%"
+                mt += f" · 1A {m1:+.1f}{d.get('mom_unit', '')}"
             tiles += (f"<div class='tile' style='--c:{ccol}'>"
                       f"<div class='nm'><span class='d'></span>{meta['name']}</div>"
                       f"<div class='vl'>{fmt(d['current'], unit)}</div>"
-                      f"<div class='mt'>{mt}</div></div>")
+                      f"<div class='mt'>{mt} · au {d['date']:%Y-%m-%d}</div></div>")
         html += f"<div class='grid'>{tiles}</div>"
     st.markdown(html, unsafe_allow_html=True)
 
@@ -451,7 +461,8 @@ else:
                 if not np.isnan(d.get("signed_z", np.nan)):
                     sub.append(f"z {d['signed_z']:+.2f}")
                 if not np.isnan(d.get("mom_1y", np.nan)):
-                    sub.append(f"1A {d['mom_1y']:+.1f}%")
+                    sub.append(f"1A {d['mom_1y']:+.1f}{d.get('mom_unit', '')}")
+                sub.append(f"au {d['date']:%Y-%m-%d}")
                 st.markdown(
                     f"<div class='tile' style='--c:{ccol};margin-bottom:4px'>"
                     f"<div class='nm'><span class='d'></span>{meta['name']}</div>"
@@ -470,7 +481,8 @@ else:
 
 with st.expander("⚙️  Diagnostic des sources"):
     st.markdown(f"**Indicateurs actifs :** {len(dashboard)} affichés "
-                f"({all_series_count()} au catalogue)")
+                f"sur {visible_series_count()} attendus ({all_series_count()} entrées au catalogue)")
+    st.markdown(f"**Périmètre :** {EURO_AREA_SCOPE}")
     if errors:
         for code, msg in errors.items():
             st.markdown(f"- `{code}` : {msg}")
