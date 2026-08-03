@@ -31,14 +31,9 @@ Ce projet récupère une trentaine d'indicateurs économiques de la zone euro (t
 
 Uniquement des **sources officielles publiques, sans clé d'accès** :
 - **BCE** (ECB Data Portal) : taux directeurs, €STR, CISS (indice de stress de la BCE), rendements souverains, monnaie, crédit, chômage…
-- **Eurostat** : inflation HICP, production industrielle, ventes de détail, confiance, sentiment économique (ESI), faillites d'entreprises…
+- **Eurostat** : inflation HICP, production industrielle, ventes de détail, confiance, sentiment économique (ESI)…
 
 > Le PMI (propriétaire) est remplacé par l'**ESI** de la Commission européenne, l'équivalent officiel et gratuit.
-
-**Lacune connue au 3 août 2026.** Le jeu Eurostat `sts_rb_q` déclare la modalité
-EA21 mais ne renvoie encore aucune observation de faillites pour cette combinaison.
-`BANKRUPT` reste donc au catalogue mais est exclu du score, avec un diagnostic public,
-jusqu'à ce qu'Eurostat publie les valeurs EA21. Le builder reteste la série à chaque mise à jour.
 
 ### Deux façons de l'utiliser
 
@@ -78,7 +73,7 @@ Outil d'information uniquement. **Ce n'est pas un conseil en investissement.** L
 
 ### What is it, in two sentences?
 
-This project pulls ~30 euro-area economic indicators (interest rates, inflation, unemployment, credit, markets, bankruptcies…), compares each to its own history, and derives **a global risk score from 0 to 100** plus a list of **alert signals**. Its scope is the euro area's current composition, **EA21 since 1 January 2026**. A series without EA21 observations or with an outdated latest observation is excluded from the score and disclosed in diagnostics.
+This project pulls ~30 euro-area economic indicators (interest rates, inflation, unemployment, credit, markets…), compares each to its own history, and derives **a global risk score from 0 to 100** plus a list of **alert signals**. Its scope is the euro area's current composition, **EA21 since 1 January 2026**. A series without EA21 observations or with an outdated latest observation is excluded from the score and disclosed in diagnostics.
 
 ### What you see on screen
 
@@ -96,14 +91,9 @@ This project pulls ~30 euro-area economic indicators (interest rates, inflation,
 
 Only **official, public, key-free sources**:
 - **ECB** (ECB Data Portal): policy rates, €STR, CISS (the ECB's own systemic-stress index), sovereign yields, money, credit, unemployment…
-- **Eurostat**: HICP inflation, industrial production, retail sales, confidence, Economic Sentiment Indicator (ESI), corporate bankruptcies…
+- **Eurostat**: HICP inflation, industrial production, retail sales, confidence, Economic Sentiment Indicator (ESI)…
 
 > PMI (proprietary) is replaced by the European Commission's **ESI**, the free official equivalent.
-
-**Known gap as of 3 August 2026.** Eurostat dataset `sts_rb_q` exposes the EA21
-category but currently returns no bankruptcy observation for this combination.
-`BANKRUPT` remains in the catalogue but is excluded from the score, with a public
-diagnostic, until Eurostat publishes EA21 values. Every refresh retries the series.
 
 ### Two ways to run it
 

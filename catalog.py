@@ -195,12 +195,6 @@ SERIES_CATALOG = {
                       "key": "BSI.M.U2.N.A.A20T.A.I.U2.2250.Z01.A",     "freq": "M", "direction": "down", "unit": "%"},
         "LOANS_NFC": {"name": "Crédit aux entreprises (taux croissance an.)", "source": "ecb",
                       "key": "BSI.M.U2.N.A.A20T.A.I.U2.2240.Z01.A",     "freq": "M", "direction": "down", "unit": "%"},
-        "BANKRUPT":  {"name": "Faillites d'entreprises YoY", "source": "eurostat",
-                      "dataset": "sts_rb_q",
-                      "filters": {"geo": "EA21", "indic_bt": "BKRT", "nace_r2": "B-S_X_O_S94",
-                                  "s_adj": "SCA", "unit": "I15"},
-                      "freq": "Q", "direction": "up", "unit": "%", "yoy": True,
-                      "empty_message": "Eurostat ne publie aucune valeur EA21 pour cette combinaison"},
     },
 
     # ---- 7. Activité réelle & consommation ------------------------------
