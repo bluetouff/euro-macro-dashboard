@@ -19,7 +19,7 @@ Chaque série porte :
 
 NOTE DE FIABILITÉ : les clés ECB sont vérifiées sur data.ecb.europa.eu. Les codes
 Eurostat suivent la nomenclature standard mais leurs dimensions bougent parfois
-(EA19 -> EA20, libellés s_adj...). Le `catalog.py` est le SEUL endroit à ajuster :
+(EA20 -> EA21, libellés s_adj...). Le `catalog.py` est le SEUL endroit à ajuster :
 toute série qui renvoie une erreur est ignorée proprement et signalée dans l'UI.
 """
 
@@ -33,6 +33,15 @@ PRE_COVID_END   = "2019-12-31"
 ZSCORE_WINDOW_YEARS = 5          # fenêtre glissante pour le z-score
 ZSCORE_WARNING      = 1.0        # |z| signé >= 1.0  -> 🟡
 ZSCORE_DANGER       = 2.0        # |z| signé >= 2.0  -> 🔴
+
+# Périmètre public du dashboard. L'agrégat Eurostat `EA` est utilisé uniquement
+# lorsque le jeu de données représente explicitement la composition évolutive.
+EURO_AREA_SCOPE = "Zone euro · composition courante (EA21 depuis 2026)"
+EURO_AREA_CODE = "EA21"
+
+# Une série hors de ces délais est exclue du score au lieu d'être affichée comme
+# courante. Les dates mensuelles/trimestrielles sont les débuts de période.
+FRESHNESS_DAYS = {"D": 14, "B": 14, "W": 28, "M": 105, "Q": 320, "A": 550}
 
 # Récessions zone euro (datation CEPR / Euro Area Business Cycle Dating Committee)
 # Utilisées pour valider/pondérer le score composite par backtest.
@@ -48,7 +57,7 @@ EURO_RECESSION_PERIODS = [
 REGIME_CHANGE_SERIES = {"DFR", "MRO", "ESTR", "EURIBOR3M"}
 
 # Séries pour lesquelles le momentum n'a pas de sens (indices de stress déjà normalisés).
-NO_MOMENTUM_SERIES = {"CISS", "CISS_SOV", "CONS_CONF"}
+NO_MOMENTUM_SERIES = {"CISS", "CISS_SOV", "CISS_BM", "CONS_CONF"}
 
 # ============================================================
 # LIBELLÉS & ICÔNES DES FAMILLES
@@ -89,15 +98,18 @@ SERIES_CATALOG = {
     # ---- 1. Taux & politique monétaire BCE -------------------------------
     "taux_monetaire": {
         "DFR":       {"name": "Taux dépôt BCE (DFR)", "source": "ecb",
-                      "key": "FM.B.U2.EUR.4F.KR.DFR.LEV",            "freq": "B", "direction": "up",   "unit": "%"},
+                      "key": "FM.B.U2.EUR.4F.KR.DFR.LEV",            "freq": "B", "direction": "up",   "unit": "%",
+                      "max_age_days": 550},  # série événementielle : nouvelle obs seulement si changement
         "MRO":       {"name": "Taux refi principal (MRO)", "source": "ecb",
-                      "key": "FM.B.U2.EUR.4F.KR.MRR_FR.LEV",         "freq": "B", "direction": "up",   "unit": "%"},
+                      "key": "FM.B.U2.EUR.4F.KR.MRR_FR.LEV",         "freq": "B", "direction": "up",   "unit": "%",
+                      "max_age_days": 550},  # série événementielle : nouvelle obs seulement si changement
         "ESTR":      {"name": "€STR (taux court)", "source": "ecb",
                       "key": "EST.B.EU000A2X2A25.WT",                "freq": "B", "direction": "up",   "unit": "%"},
         "EURIBOR3M": {"name": "Euribor 3M", "source": "ecb",
                       "key": "FM.M.U2.EUR.RT.MM.EURIBOR3MD_.HSTA",   "freq": "M", "direction": "up",   "unit": "%"},
         "EURUSD":    {"name": "EUR/USD", "source": "ecb",
-                      "key": "EXR.D.USD.EUR.SP00.A",                 "freq": "D", "direction": "down", "unit": ""},
+                      "key": "EXR.D.USD.EUR.SP00.A",                 "freq": "D", "direction": "down", "unit": "",
+                      "momentum": "relative"},
     },
 
     # ---- 2. Signaux avancés (alerte précoce) ----------------------------
@@ -117,18 +129,18 @@ SERIES_CATALOG = {
                       "direction": "down", "unit": "pb"},
         "EEI":       {"name": "Anticipations d'emploi (EEI)", "source": "eurostat",
                       "dataset": "ei_bssi_m_r2",
-                      "filters": {"geo": "EA20", "indic": "BS-EEI-I", "s_adj": "SA"},
+                      "filters": {"geo": "EA21", "indic": "BS-EEI-I", "s_adj": "SA"},
                       "freq": "M", "direction": "down", "unit": "idx"},
     },
 
     # ---- 3. Stress systémique & liquidité --------------------------------
     "stress_systemique": {
-        "CISS":      {"name": "CISS (stress systémique)", "source": "ecb",
-                      "key": "CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX",        "freq": "D", "direction": "up",   "unit": "idx"},
-        "CISS_SOV":  {"name": "SovCISS (stress souverain)", "source": "ecb",
-                      "key": "CISS.M.U2.Z0Z.4F.EC.SOV_GDPW.IDX",     "freq": "M", "direction": "up",   "unit": "idx"},
+        "CISS":      {"name": "New CISS (stress systémique)", "source": "ecb",
+                      "key": "CISS.D.U2.Z0Z.4F.EC.SS_CIN.IDX",       "freq": "D", "direction": "up",   "unit": "idx"},
+        "CISS_SOV":  {"name": "New SovCISS (stress souverain)", "source": "ecb",
+                      "key": "CISS.D.U2.Z0Z.4F.EC.SOV_EWN.IDX",      "freq": "D", "direction": "up",   "unit": "idx"},
         "CISS_BM":   {"name": "CISS sous-indice obligataire", "source": "ecb",
-                      "key": "CISS.D.U2.Z0Z.4F.EC.SS_BM.CON",        "freq": "D", "direction": "up",   "unit": "idx"},
+                      "key": "CISS.D.U2.Z0Z.4F.EC.SS_BMN.CON",       "freq": "D", "direction": "up",   "unit": "idx"},
     },
 
     # ---- 3. Souverain & spreads (Maastricht 10Y) -------------------------
@@ -151,13 +163,17 @@ SERIES_CATALOG = {
 
     # ---- 4. Inflation ----------------------------------------------------
     "inflation": {
-        "HICP":      {"name": "HICP YoY (zone euro)", "source": "ecb",
-                      "key": "ICP.M.U2.N.000000.4.ANR",              "freq": "M", "direction": "up", "unit": "%"},
-        "HICP_CORE": {"name": "HICP core YoY", "source": "ecb",
-                      "key": "ICP.M.U2.N.XEF000.4.ANR",              "freq": "M", "direction": "up", "unit": "%"},
+        "HICP":      {"name": "HICP YoY (zone euro)", "source": "eurostat",
+                      "dataset": "prc_hicp_minr",
+                      "filters": {"geo": "EA", "coicop18": "TOTAL", "unit": "RCH_A"},
+                      "freq": "M", "direction": "up", "unit": "%"},
+        "HICP_CORE": {"name": "HICP core YoY", "source": "eurostat",
+                      "dataset": "prc_hicp_minr",
+                      "filters": {"geo": "EA", "coicop18": "TOT_X_NRG_FOOD", "unit": "RCH_A"},
+                      "freq": "M", "direction": "up", "unit": "%"},
         "PPI":       {"name": "Prix production industrielle YoY", "source": "eurostat",
                       "dataset": "sts_inppd_m",
-                      "filters": {"geo": "EA20", "nace_r2": "B-D", "s_adj": "NSA",
+                      "filters": {"geo": "EA21", "nace_r2": "B-D", "s_adj": "NSA",
                                   "unit": "I21"},
                       "freq": "M", "direction": "up", "unit": "%", "yoy": True},
     },
@@ -181,55 +197,63 @@ SERIES_CATALOG = {
                       "key": "BSI.M.U2.N.A.A20T.A.I.U2.2240.Z01.A",     "freq": "M", "direction": "down", "unit": "%"},
         "BANKRUPT":  {"name": "Faillites d'entreprises YoY", "source": "eurostat",
                       "dataset": "sts_rb_q",
-                      "filters": {"geo": "EA20", "indic_bt": "BKRT", "nace_r2": "B-S_X_O_S94",
+                      "filters": {"geo": "EA21", "indic_bt": "BKRT", "nace_r2": "B-S_X_O_S94",
                                   "s_adj": "SCA", "unit": "I15"},
-                      "freq": "Q", "direction": "up", "unit": "%", "yoy": True},
+                      "freq": "Q", "direction": "up", "unit": "%", "yoy": True,
+                      "empty_message": "Eurostat ne publie aucune valeur EA21 pour cette combinaison"},
     },
 
     # ---- 7. Activité réelle & consommation ------------------------------
     "activite_reelle": {
         "IP":        {"name": "Production industrielle YoY", "source": "eurostat",
                       "dataset": "sts_inpr_m",
-                      "filters": {"geo": "EA20", "nace_r2": "B-D", "s_adj": "SCA",
+                      "filters": {"geo": "EA21", "nace_r2": "B-D", "s_adj": "SCA",
                                   "unit": "I21"},
                       "freq": "M", "direction": "down", "unit": "%", "yoy": True},
         "RETAIL":    {"name": "Ventes de détail YoY", "source": "eurostat",
                       "dataset": "sts_trtu_m",
-                      "filters": {"geo": "EA20", "nace_r2": "G47", "s_adj": "SCA",
+                      "filters": {"geo": "EA21", "nace_r2": "G47", "s_adj": "SCA",
                                   "indic_bt": "TOVV", "unit": "I21"},
                       "freq": "M", "direction": "down", "unit": "%", "yoy": True},
         "CONS_CONF": {"name": "Confiance des consommateurs", "source": "eurostat",
                       "dataset": "ei_bsco_m",
-                      "filters": {"geo": "EA20", "indic": "BS-CSMCI", "s_adj": "SA",
+                      "filters": {"geo": "EA21", "indic": "BS-CSMCI", "s_adj": "SA",
                                   "unit": "BAL"},
                       "freq": "M", "direction": "down", "unit": "bal"},
         "ESI":       {"name": "Sentiment économique (ESI)", "source": "eurostat",
                       "dataset": "ei_bssi_m_r2",
-                      "filters": {"geo": "EA20", "indic": "BS-ESI-I", "s_adj": "SA"},
+                      "filters": {"geo": "EA21", "indic": "BS-ESI-I", "s_adj": "SA"},
                       "freq": "M", "direction": "down", "unit": "idx"},
     },
 
     # ---- 8. Corporate & marchés -----------------------------------------
     "corporate_marches": {
         "STOXX":     {"name": "EuroStoxx large (niveau)", "source": "ecb",
-                      "key": "FM.M.U2.EUR.DS.EI.DJEURST.HSTA",       "freq": "M", "direction": "down", "unit": "idx"},
+                      "key": "FM.M.U2.EUR.DS.EI.DJEURST.HSTA",       "freq": "M", "direction": "down", "unit": "idx",
+                      "momentum": "relative"},
         "STOXX50":   {"name": "EURO STOXX 50 (niveau)", "source": "ecb",
-                      "key": "FM.M.U2.EUR.DS.EI.DJES50I.HSTA",       "freq": "M", "direction": "down", "unit": "pts"},
+                      "key": "FM.M.U2.EUR.DS.EI.DJES50I.HSTA",       "freq": "M", "direction": "down", "unit": "pts",
+                      "momentum": "relative"},
     },
 
     # ---- 9. Immobilier ---------------------------------------------------
     "immobilier": {
         "HPI":       {"name": "Prix immobilier YoY", "source": "eurostat",
                       "dataset": "prc_hpi_q",
-                      "filters": {"geo": "EA20", "purchase": "TOTAL", "unit": "I15_NSA"},
+                      "filters": {"geo": "EA21", "purchase": "TOTAL", "unit": "I15_NSA"},
                       "freq": "Q", "direction": "down", "unit": "%", "yoy": True},
     },
 }
 
 
 def all_series_count():
-    """Compte total de séries (hors séries calculées)."""
+    """Compte total d'entrées du catalogue, y compris calculées et cachées."""
     return sum(len(v) for v in SERIES_CATALOG.values())
+
+
+def visible_series_count():
+    """Compte les indicateurs attendus dans le dashboard public."""
+    return sum(1 for _, _, meta in flat_series() if not meta.get("hidden"))
 
 
 def flat_series():

@@ -76,6 +76,10 @@
   .al .av{font-family:ui-monospace,'SF Mono',monospace;font-size:12px;font-weight:700;}
   .muted{color:var(--mut);font-size:11px;}
   .ok-banner{background:rgba(94,234,212,.06);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:10px 14px;font-size:13px;}
+  .quality-banner{background:rgba(245,177,61,.08);border:1px solid rgba(245,177,61,.42);color:var(--gold);border-radius:8px;padding:10px 14px;font-size:12px;margin:12px 0;}
+  .asof{display:flex;justify-content:space-between;gap:8px;margin-top:5px;color:var(--faint);font-size:9px;}
+  .asof a{color:var(--mut);text-decoration:none;}
+  .asof a:hover{color:var(--teal);}
   .help-card{background:rgba(255,255,255,.018);border:1px solid var(--line);border-left:2px solid var(--teal);
     border-radius:8px;padding:13px 15px;color:var(--mut);font-size:.82rem;line-height:1.55;margin:8px 0 14px;}
   .help-card strong{color:var(--paper);}
@@ -110,7 +114,7 @@
   if(!S){ app.innerHTML = "<p class='muted'>Aucun instantané trouvé. Lancez "+
     "<code>python build_snapshot.py</code> pour générer <code>snapshot.js</code>.</p>"; return; }
 
-  const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function fmt(v){
     if(v===null||v===undefined) return 'n/a';
     const a=Math.abs(v);
@@ -127,7 +131,7 @@
     const faq = view === 'faq' ? 'active' : '';
     return "<header class='tape'>"+
       "<div class='brand'><b>Euro</b> Macro <b>Risk</b></div>"+
-      "<div class='tagline'>Zone euro EA20 · BCE · Eurostat · cycle · stress macro</div>"+
+      "<div class='tagline'>"+esc(S.scope||'Zone euro · composition courante')+" · BCE · Eurostat</div>"+
       "<nav class='top-nav' aria-label='Navigation'>"+
         "<a class='nav-link "+radar+"' href='?'>Radar</a>"+
         "<a class='nav-link "+faq+"' href='?view=faq'>Aide / FAQ</a>"+
@@ -140,7 +144,7 @@
     return "<div class='site-footer'>"+
       "<a class='l0g-logo' href='https://l0g.fr' target='_blank' rel='noopener' aria-label='l0g.fr'>"+
         "<span class='slash'>//</span><span>l0g.fr</span></a>"+
-      "<span>Euro Macro Risk · MIT License</span>"+
+      "<span>Euro Macro Risk · MIT License · révision "+esc((S.source_sha||'n/a').slice(0,12))+"</span>"+
     "</div>";
   }
 
@@ -149,8 +153,8 @@
       "<div class='title'>Aide / FAQ</div>"+
       "<div class='help-card'><strong>Objectif.</strong> Euro Macro Risk agrège des séries publiques BCE et Eurostat pour surveiller le régime macro de la zone euro. L'outil ne prédit pas une récession et ne donne pas de conseil d'investissement : il aide à savoir quels canaux lire en premier.</div>"+
       "<div class='faq-grid'>"+
-        "<div class='faq-card'><strong>Périmètre</strong> Le dashboard suit la zone euro, principalement EA20, avec des séries monétaires, souveraines, inflation, emploi, crédit, activité, corporate et immobilier.</div>"+
-        "<div class='faq-card'><strong>Score 0-100</strong> Le score combine les indicateurs disponibles, pondérés par leur pouvoir prédictif historique face aux récessions CEPR. Plus le score monte, plus le régime est tendu.</div>"+
+        "<div class='faq-card'><strong>Périmètre</strong> Le dashboard suit la composition courante de la zone euro, soit EA21 depuis le 1er janvier 2026. L'agrégat Eurostat évolutif EA n'est utilisé que lorsque le jeu de données le définit ainsi.</div>"+
+        "<div class='faq-card'><strong>Score 0-100</strong> Le score combine les indicateurs disponibles avec une pondération heuristique fondée sur leur corrélation historique avec l'état de récession CEPR six mois plus tard. Ce n'est pas une validation prospective.</div>"+
         "<div class='faq-card'><strong>Sources</strong> Les données viennent de sources publiques et gratuites : ECB Data Portal, Eurostat et datation CEPR-EABCN pour les récessions de la zone euro.</div>"+
         "<div class='faq-card'><strong>Lecture</strong> Le score global compte moins que sa composition : il faut regarder si la tension vient des taux, du souverain, du crédit, de l'activité réelle ou du stress systémique.</div>"+
       "</div>"+
@@ -191,19 +195,24 @@
       "<div class='stat' style='border-left-color:"+regimeColor+"'><div class='lab'>Régime macro</div>"+
         "<span class='pill' style='background:"+regimeColor+"22;color:"+regimeColor+";border:1px solid "+regimeColor+"55'>"+
         esc(r.label)+"</span></div>"+
-      "<div class='stat' style='border-left-color:"+(S.ciss?statusColor(S.ciss.status):'var(--faint)')+"'><div class='lab'>CISS · stress systémique BCE</div>"+
+      "<div class='stat' style='border-left-color:"+(S.ciss?statusColor(S.ciss.status):'var(--faint)')+"'><div class='lab'>New CISS · stress systémique BCE</div>"+
         (S.ciss?("<div class='big' style='color:"+statusColor(S.ciss.status)+"'>"+fmt(S.ciss.value)+" "+emoji[S.ciss.status]+"</div>"):"<div class='muted'>n/d</div>")+"</div>"+
       "<div class='stat' style='border-left-color:var(--teal)'><div class='lab'>État des "+c.total+" indicateurs</div>"+
         "<div class='dots'>🟢 "+c.ok+"&nbsp;&nbsp;🟡 "+c.warn+"&nbsp;&nbsp;🔴 "+c.dang+"</div></div>"+
     "</div>";
 
+  if(S.quality && S.quality.status!=='ok'){
+    html += "<div class='quality-banner'>Données dégradées : "+S.quality.active+"/"+S.quality.expected+
+      " indicateurs actifs. Les séries absentes ou périmées sont exclues du score et détaillées dans le diagnostic.</div>";
+  }
+
   // ---------- LÉGENDE ----------
   html +=
     "<details><summary>ℹ️ Comment lire ce tableau de bord</summary><div class='body'>"+
-    "<b>Score global 0-100</b> : agrégation pondérée par pouvoir prédictif (corrélation historique "+
-    "aux récessions CEPR). 🟩 &lt;45 Risk-On · ⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 &gt;70 Stress.<br>"+
+    "<b>Score global 0-100</b> : agrégation à pondération heuristique (corrélation historique "+
+    "avec l'état de récession CEPR à +6 mois, sans validation hors échantillon). 🟩 &lt;45 Risk-On · ⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 &gt;70 Stress.<br>"+
     "<b>Couleur d'un indicateur</b> = z-score signé (écart à sa moyenne 5 ans, orienté risque) : "+
-    "🟢 normal · 🟡 tension (|z|≥1) · 🔴 alerte (|z|≥2). <code>z</code> = z-score · <code>1A</code> = variation sur 1 an.<br>"+
+    "🟢 normal · 🟡 tension (|z|≥1) · 🔴 alerte (|z|≥2). <code>z</code> = z-score · <code>1A</code> = variation calendaire sur 1 an, en points pour les taux et en % pour les niveaux de marché.<br>"+
     "<b>Signaux avancés</b> = indicateurs qui précèdent le cycle (pente de courbe, M1 réel, M3, "+
     "anticipations d'emploi). Le PMI étant propriétaire, on utilise l'ESI (Commission/Eurostat).<br>"+
     "<span class='muted'>Sources publiques BCE + Eurostat · CISS © BCE · récessions CEPR-EABCN.</span>"+
@@ -227,7 +236,7 @@
   // ---------- HISTORIQUE ----------
   html += "<details><summary>📈 Score composite historique vs récessions (CEPR)</summary><div class='body'>"+
           "<div class='chart-shell'>"+histChart()+"</div><div class='muted'>Zones rouges = récessions CEPR. Un score &gt;55 avant/pendant "+
-          "ces zones valide le pouvoir d'alerte du composite.</div></div></details>";
+          "ces zones fournit une lecture rétrospective, pas une validation prospective.</div></div></details>";
 
   // ---------- FAMILLES ----------
   S.families.forEach(f=>{
@@ -238,21 +247,27 @@
     f.indicators.forEach(d=>{
       const tileColor = statusColor(d.status);
       let mt = (d.z!==null? "<b style='color:"+tileColor+"'>z "+sgn(d.z)+"</b>":"");
-      if(d.mom_1y!==null) mt += " · 1A "+sgn(d.mom_1y,0)+"%";
+      if(d.mom_1y!==null) mt += " · 1A "+sgn(d.mom_1y,1)+esc(d.mom_unit||'');
       html += "<div class='tile' style='--c:"+tileColor+"'>"+
         "<div class='nm'><span class='d'></span>"+esc(d.name)+"</div>"+
         "<div class='vl'>"+fmt(d.value)+(d.unit?"<u>"+esc(d.unit)+"</u>":"")+"</div>"+
         "<div class='mt'>"+mt+"</div>"+
-        sparkSVG(d.spark,tileColor)+"</div>";
+        sparkSVG(d.spark,tileColor)+
+        "<div class='asof'><span>au "+esc(d.as_of||'n/a')+"</span><a href='"+esc(d.source_url||'#')+"' target='_blank' rel='noopener'>source</a></div></div>";
     });
     html += "</div>";
   });
 
   // ---------- DIAGNOSTIC ----------
-  let diag = "<b>Indicateurs actifs :</b> "+c.total+" affichés ("+S.catalog_total+" au catalogue)<br>";
+  let diag = "<b>Indicateurs actifs :</b> "+c.total+" affichés sur "+
+    ((S.quality&&S.quality.expected)||S.catalog_total)+" attendus<br>"+
+    "<b>Périmètre :</b> "+esc(S.scope||'n/a')+"<br>"+
+    "<b>Révision source :</b> <code>"+esc(S.source_sha||'n/a')+"</code><br>";
   const errs = S.errors||{};
+  const errSources = S.error_sources||{};
   const ek = Object.keys(errs);
-  if(ek.length){ diag += "<b>Séries ignorées :</b><br>"; ek.forEach(k=>diag+="• <code>"+esc(k)+"</code> : "+esc(errs[k])+"<br>"); }
+  if(ek.length){ diag += "<b>Séries ignorées :</b><br>"; ek.forEach(k=>diag+="• <code>"+esc(k)+"</code> : "+esc(errs[k])+
+    (errSources[k]?" · <a href='"+esc(errSources[k])+"' target='_blank' rel='noopener'>source</a>":"")+"<br>"); }
   else { diag += "<span style='color:#5eead4'>Toutes les séries du catalogue ont été récupérées.</span><br>"; }
   diag += "<span class='muted'>© European Central Bank (ECB Data Portal) &amp; Eurostat · CISS © ECB · récessions CEPR-EABCN.</span>";
   html += "<details><summary>⚙️ Diagnostic des sources</summary><div class='body'>"+diag+"</div></details>";

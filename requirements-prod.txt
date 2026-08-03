@@ -1,0 +1,4 @@
+# Dépendances minimales du constructeur statique de production.
+numpy>=1.26,<3
+pandas>=2.2,<4
+requests>=2.32,<3
