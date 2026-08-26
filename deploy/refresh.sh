@@ -10,6 +10,7 @@ APP_DIR="/opt/euromacro"                 # code + venv (jamais servi par Apache)
 WEB_DIR="/var/www/html/euromacro"         # web root statique (servi par Apache)
 BACKUP_DIR="$APP_DIR/.last-good"
 REVISION_FILE="$APP_DIR/DEPLOYED_SHA"
+ATTESTED_REVISION_FILE="${EUROMACRO_ATTESTED_SHA_FILE:-$APP_DIR/L0G_ATTESTED_SHA}"
 
 cd "$APP_DIR"
 
@@ -17,8 +18,17 @@ if [[ ! -f "$REVISION_FILE" ]] || ! grep -Eq '^[0-9a-f]{40}$' "$REVISION_FILE"; 
     echo "REFUS — DEPLOYED_SHA absent ou invalide" >&2
     exit 1
 fi
+if [[ ! -f "$ATTESTED_REVISION_FILE" ]] || ! grep -Eq '^[0-9a-f]{40}$' "$ATTESTED_REVISION_FILE"; then
+    echo "REFUS — attestation l0g absente ou invalide" >&2
+    exit 1
+fi
 export EUROMACRO_SOURCE_SHA
 EUROMACRO_SOURCE_SHA="$(tr -d '[:space:]' < "$REVISION_FILE")"
+L0G_ATTESTED_SHA="$(tr -d '[:space:]' < "$ATTESTED_REVISION_FILE")"
+if [[ "$EUROMACRO_SOURCE_SHA" != "$L0G_ATTESTED_SHA" ]]; then
+    echo "REFUS — révision Euro non attestée par l’agrégateur l0g" >&2
+    exit 1
+fi
 
 # Génère et valide dans APP_DIR. Rien n'est publié si la couverture, les dates
 # sources, les indicateurs critiques ou la traçabilité sont invalides.
