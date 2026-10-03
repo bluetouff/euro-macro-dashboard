@@ -32,6 +32,16 @@ Ce projet récupère une trentaine d'indicateurs économiques de la zone euro (t
 Uniquement des **sources officielles publiques, sans clé d'accès** :
 - **BCE** (ECB Data Portal) : taux directeurs, €STR, CISS (indice de stress de la BCE), rendements souverains, monnaie, crédit, chômage…
 - **Eurostat** : inflation HICP, production industrielle, ventes de détail, confiance, sentiment économique (ESI)…
+- **Commission européenne, DG ECFIN** : anticipations d'emploi (EEI), via
+  [BCS_MAIN_INDICATORS](https://webgate.ec.europa.eu/ecfin/redisstat/databrowser/view/BCS_MAIN_INDICATORS/default/table).
+  La série utilise l'agrégat zone euro `EA` publié par la Commission.
+
+Les filtres doivent correspondre exactement aux dimensions de la réponse. Une
+série absente ne peut jamais être remplacée par la première série disponible.
+Les corrections des codes EEI, ventes de détail et immobilier impliquent une
+nouvelle collecte et un recalcul du score et de son historique ; les anciens
+snapshots ne sont pas réécrits. La valeur EEI des anciens snapshots était issue
+de la confiance dans la construction et ne doit pas être interprétée comme l'EEI.
 
 > Le PMI (propriétaire) est remplacé par l'**ESI** de la Commission européenne, l'équivalent officiel et gratuit.
 
@@ -92,6 +102,13 @@ This project pulls ~30 euro-area economic indicators (interest rates, inflation,
 Only **official, public, key-free sources**:
 - **ECB** (ECB Data Portal): policy rates, €STR, CISS (the ECB's own systemic-stress index), sovereign yields, money, credit, unemployment…
 - **Eurostat**: HICP inflation, industrial production, retail sales, confidence, Economic Sentiment Indicator (ESI)…
+- **European Commission, DG ECFIN**: Employment Expectations Indicator (EEI),
+  from `BCS_MAIN_INDICATORS`, using the Commission's `EA` euro-area aggregate.
+
+Source filters are matched exactly. Missing series are never substituted with
+the first available series. Corrected EEI, retail and house-price codes require
+a fresh collection and score/history rebuild. Earlier snapshots are not rewritten;
+their EEI value incorrectly represented construction confidence.
 
 > PMI (proprietary) is replaced by the European Commission's **ESI**, the free official equivalent.
 

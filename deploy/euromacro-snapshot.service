@@ -7,12 +7,19 @@
 Description=Euro Macro Risk — régénération de l'instantané
 After=network-online.target
 Wants=network-online.target
+# Trois lancements au maximum, puis attente du prochain timer quotidien.
+StartLimitIntervalSec=4h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
 User=euromacro
 Group=euromacro
 ExecStart=/opt/euromacro/deploy/refresh.sh
+TimeoutStartSec=15min
+TimeoutStopSec=30s
+Restart=on-failure
+RestartSec=5min
 
 # --- Durcissement ---
 NoNewPrivileges=true

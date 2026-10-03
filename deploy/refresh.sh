@@ -14,6 +14,10 @@ ATTESTED_REVISION_FILE="${EUROMACRO_ATTESTED_SHA_FILE:-$APP_DIR/L0G_ATTESTED_SHA
 
 cd "$APP_DIR"
 
+# Empêche un lancement manuel de concurrencer le timer pendant la publication.
+exec 9>"$APP_DIR/.refresh.lock"
+flock -n 9 || { echo "REFUS — rafraîchissement déjà en cours" >&2; exit 1; }
+
 if [[ ! -f "$REVISION_FILE" ]] || ! grep -Eq '^[0-9a-f]{40}$' "$REVISION_FILE"; then
     echo "REFUS — DEPLOYED_SHA absent ou invalide" >&2
     exit 1

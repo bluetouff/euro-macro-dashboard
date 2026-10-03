@@ -37,6 +37,7 @@
   .status-pill{color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:4px 10px;
     font-size:.7rem;display:flex;gap:8px;align-items:center;}
   .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .status-pill.needs-attention .status-dot{background:var(--gold);}
   .title{font-size:24px;font-weight:800;margin:0;color:var(--bright);border-bottom:1px solid var(--line);
     padding-bottom:8px;text-shadow:0 0 30px rgba(94,234,212,.18);}
   .sub{color:var(--mut);font-size:12px;margin-top:9px;line-height:1.5;}
@@ -126,6 +127,28 @@
   const params = new URLSearchParams(window.location.search);
   const view = ['faq','help','aide'].includes((params.get('view')||'').toLowerCase()) ? 'faq' : 'radar';
 
+  function updateFreshness(){
+    const age = (Date.now()-Date.parse(S.generated_at))/3600000;
+    let message = '';
+    if(!Number.isFinite(age) || age < -5/60){
+      message = "Date de mise à jour invalide : fraîcheur non vérifiable.";
+    } else if(age > 36){
+      message = "Instantané périmé (plus de 36 h). Les scores ci-dessous sont historiques, pas un état courant.";
+    } else if(age > 26){
+      message = "Mise à jour quotidienne en retard (plus de 26 h). Le dernier instantané reste affiché ; son état de collecte ne décrit pas le service actuel.";
+    }
+    const banner = document.getElementById('snapshot-freshness');
+    banner.textContent = message;
+    banner.hidden = !message;
+    document.getElementById('snapshot-status').classList.toggle('needs-attention',
+      Boolean(message) || !S.quality || S.quality.status!=='ok');
+  }
+
+  function watchFreshness(){
+    updateFreshness();
+    setInterval(updateFreshness, 60000);
+  }
+
   function header(){
     const radar = view === 'radar' ? 'active' : '';
     const faq = view === 'faq' ? 'active' : '';
@@ -136,8 +159,8 @@
         "<a class='nav-link "+radar+"' href='?'>Radar</a>"+
         "<a class='nav-link "+faq+"' href='?view=faq'>Aide / FAQ</a>"+
       "</nav>"+
-      "<div class='status-pill'><span class='status-dot'></span>"+esc(S.generated_at)+"</div>"+
-    "</header>";
+      "<div id='snapshot-status' class='status-pill'><span class='status-dot'></span>"+esc(S.generated_at)+"</div>"+
+    "</header><div id='snapshot-freshness' class='quality-banner' role='status' hidden></div>";
   }
 
   function footer(){
@@ -155,7 +178,7 @@
       "<div class='faq-grid'>"+
         "<div class='faq-card'><strong>Périmètre</strong> Le dashboard suit la composition courante de la zone euro, soit EA21 depuis le 1er janvier 2026. L'agrégat Eurostat évolutif EA n'est utilisé que lorsque le jeu de données le définit ainsi.</div>"+
         "<div class='faq-card'><strong>Score 0-100</strong> Le score combine les indicateurs disponibles avec une pondération heuristique fondée sur leur corrélation historique avec l'état de récession CEPR six mois plus tard. Ce n'est pas une validation prospective.</div>"+
-        "<div class='faq-card'><strong>Sources</strong> Les données viennent de sources publiques et gratuites : ECB Data Portal, Eurostat et datation CEPR-EABCN pour les récessions de la zone euro.</div>"+
+        "<div class='faq-card'><strong>Sources</strong> Les données viennent de sources publiques et gratuites : ECB Data Portal, Eurostat, DG ECFIN pour l'EEI et datation CEPR-EABCN pour les récessions de la zone euro.</div>"+
         "<div class='faq-card'><strong>Lecture</strong> Le score global compte moins que sa composition : il faut regarder si la tension vient des taux, du souverain, du crédit, de l'activité réelle ou du stress systémique.</div>"+
       "</div>"+
       "<details open><summary>Que mesure exactement le radar ?</summary><div class='body'>Chaque série est comparée à son régime récent via un z-score orienté risque. Une valeur élevée n'est pas toujours un risque : certaines séries deviennent risquées quand elles baissent, comme la pente de courbe ou la monnaie réelle.</div></details>"+
@@ -167,6 +190,7 @@
 
   if(view === 'faq'){
     app.innerHTML = faqPage();
+    watchFreshness();
     return;
   }
 
@@ -269,11 +293,12 @@
   if(ek.length){ diag += "<b>Séries ignorées :</b><br>"; ek.forEach(k=>diag+="• <code>"+esc(k)+"</code> : "+esc(errs[k])+
     (errSources[k]?" · <a href='"+esc(errSources[k])+"' target='_blank' rel='noopener'>source</a>":"")+"<br>"); }
   else { diag += "<span style='color:#5eead4'>Toutes les séries du catalogue ont été récupérées.</span><br>"; }
-  diag += "<span class='muted'>© European Central Bank (ECB Data Portal) &amp; Eurostat · CISS © ECB · récessions CEPR-EABCN.</span>";
+  diag += "<span class='muted'>© European Central Bank (ECB Data Portal), Eurostat &amp; DG ECFIN · CISS © ECB · récessions CEPR-EABCN.</span>";
   html += "<details><summary>⚙️ Diagnostic des sources</summary><div class='body'>"+diag+"</div></details>";
   html += footer();
 
   app.innerHTML = html;
+  watchFreshness();
 
   // ---------- helpers ----------
   function sgn(v,dec){ if(v===null||v===undefined) return 'n/a';

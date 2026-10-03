@@ -101,7 +101,8 @@ le SHA attendu. Le script publie `index.html`, `snapshot.js` et `snapshot.json`.
 ou la promotion échoue, il ne remplace pas le lot public valide.
 
 > **Pare-feu / proxy** : la machine doit pouvoir joindre en sortie HTTPS (443)
-> `data-api.ecb.europa.eu` et `ec.europa.eu`. Aucun port entrant n'est requis pour le build.
+> `data-api.ecb.europa.eu`, `ec.europa.eu` et `webgate.ec.europa.eu` (EEI DG ECFIN).
+> Aucun port entrant n'est requis pour le build.
 
 ---
 
@@ -120,6 +121,27 @@ journalctl -u euromacro-snapshot.service --no-pager   # voir les logs
 ```
 
 Le timer régénère l'instantané chaque jour à ~07h30 (avec délai aléatoire).
+Les requêtes HTTPS transitoirement en échec sont retentées au maximum trois fois,
+avec pauses de 2 puis 4 secondes (ou le délai numérique `Retry-After`, plafonné à
+30 secondes ; au-delà, échec sans reprise anticipée). Les erreurs de sélection,
+de schéma ou de TLS ne sont pas masquées par un repli sur une autre série.
+
+Chaque lancement du service est limité à 15 minutes. Un échec entraîne une nouvelle
+tentative après 5 minutes, avec trois lancements au maximum dans une fenêtre de
+4 heures ; ensuite, le prochain timer quotidien pourra relancer le service. Un
+verrou empêche deux publications concurrentes. Les logs `RETRY` et `SOURCE_ERROR`
+identifient les échecs de collecte avant le refus éventuel de publication.
+
+Le site signale un retard après 26 heures sans nouveau snapshot et un snapshot
+périmé après 36 heures, même si la dernière collecte publiée était complète.
+Le dernier snapshot n'est jamais redaté pour masquer un échec. Ces avertissements
+visuels ne constituent pas une notification externe ni un contrôle des timers.
+
+Contrôle en lecture seule, directement dans le shell du serveur (une ligne) :
+
+```bash
+systemctl show euromacro-snapshot.service -p Result -p ExecMainStatus -p ExecMainStartTimestamp -p ExecMainExitTimestamp; systemctl list-timers euromacro-snapshot.timer --all --no-pager; journalctl -u euromacro-snapshot.service -n 60 --no-pager
+```
 
 ---
 

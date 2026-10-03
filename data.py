@@ -2,8 +2,9 @@
 data.py — Récupération des données + moteur de scoring du Euro Macro Risk Dashboard.
 
 Sources (toutes publiques, sans clé) :
-  - ECB Data Portal via le package `ecbdata`
+  - ECB Data Portal via l'API CSV
   - API REST Eurostat (dissemination, format JSON-stat 2.0)
+  - API publique DG ECFIN (JSON-stat 2.0, EEI)
 
 Moteur de scoring (identique à la version US) :
   - baseline pré-Covid (2015-2019)
@@ -16,7 +17,10 @@ Moteur de scoring (identique à la version US) :
 import numpy as np
 import pandas as pd
 import requests
+import logging
+import time
 from datetime import datetime
+from urllib.parse import urlencode, urlsplit
 
 from catalog import (
     SERIES_CATALOG, PRE_COVID_START, PRE_COVID_END,
@@ -27,7 +31,56 @@ from catalog import (
 
 EUROSTAT_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
 EUROSTAT_SDMX = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/"
+ECFIN_BASE = "https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/statistics/1.0/data/"
 START = "2008-01-01"     # historique chargé (couvre GFC -> aujourd'hui)
+LOGGER = logging.getLogger(__name__)
+
+
+def _request(url, *, headers):
+    """GET borné : trois essais au maximum, uniquement sur erreur transitoire."""
+    for attempt in range(3):
+        delay = 2 ** (attempt + 1)
+        response = None
+        try:
+            response = requests.get(url, timeout=(10, 45), headers=headers)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.SSLError:
+            raise  # une erreur TLS n'est jamais contournée
+        except requests.HTTPError as exc:
+            if response.status_code not in {408, 429, 500, 502, 503, 504} or attempt == 2:
+                raise
+            # Un délai serveur supérieur au budget interdit une reprise anticipée.
+            retry_after = response.headers.get("Retry-After")
+            if retry_after is not None:
+                try:
+                    delay = max(delay, int(retry_after))
+                except ValueError:
+                    raise exc  # pas de reprise anticipée si le délai est non numérique
+                if delay > 30:
+                    raise
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 2:
+                raise
+        finally:
+            if response is not None and not response.ok:
+                response.close()
+        LOGGER.warning("RETRY host=%s attempt=%s/3 delay=%ss",
+                       urlsplit(url).hostname, attempt + 2, delay)
+        time.sleep(delay)
+
+
+def _observation_series(periods, values):
+    """Refuse un schéma ambigu ou une valeur corrompue, sans inventer de donnée."""
+    dates = pd.to_datetime(_normalize_periods(periods), errors="coerce")
+    if dates.isna().any() or dates.duplicated().any():
+        raise ValueError("dates sources invalides ou dupliquées")
+    source = pd.Series(list(values)).replace({":": None, "": None})
+    numeric = pd.to_numeric(source, errors="coerce")
+    if (source.notna() & numeric.isna()).any() or np.isinf(numeric).any():
+        raise ValueError("valeur source non numérique ou non finie")
+    result = pd.Series(numeric.to_numpy(), index=dates).dropna().sort_index()
+    return result if len(result) else None
 
 
 def _fetch_eurostat_sdmx(dataset, key, start=START):
@@ -45,24 +98,18 @@ def _fetch_eurostat_sdmx(dataset, key, start=START):
         try:
             url = (f"{EUROSTAT_SDMX}{dataset}/{key}"
                    f"?format={fmt}&startPeriod={start[:7]}")
-            r = requests.get(url, timeout=45, headers={"Accept": "*/*"})
-            r.raise_for_status()
+            r = _request(url, headers={"Accept": "*/*"})
             df = pd.read_csv(StringIO(r.text))
             tcol = "TIME_PERIOD" if "TIME_PERIOD" in df.columns else None
             vcol = ("OBS_VALUE" if "OBS_VALUE" in df.columns
                     else "values" if "values" in df.columns else None)
             if tcol and vcol:
-                s = pd.Series(
-                    pd.to_numeric(df[vcol], errors="coerce").values,
-                    index=pd.to_datetime(
-                        _normalize_periods(df[tcol].astype(str)), errors="coerce"),
-                )
-                s = s[~s.index.isna()].dropna().sort_index()
-                if len(s):
-                    return s
-        except Exception as e:  # noqa: BLE001 — on essaie le format suivant
-            last_err = e
-            continue
+                return _observation_series(df[tcol], df[vcol])
+            raise ValueError("colonnes CSV Eurostat absentes")
+        except requests.HTTPError as e:
+            if e.response.status_code not in {400, 406}:
+                raise
+            last_err = e  # seul un format refusé justifie de changer de format
     if last_err:
         raise last_err
     return None
@@ -84,19 +131,13 @@ def _fetch_ecb(key, start=START):
     flow, skey = key.split(".", 1)
     url = (f"{ECB_BASE}{flow}/{skey}"
            f"?format=csvdata&startPeriod={start[:7]}")
-    r = requests.get(url, timeout=30, headers={"Accept": "text/csv"})
-    r.raise_for_status()
+    r = _request(url, headers={"Accept": "text/csv"})
     df = pd.read_csv(StringIO(r.text))
     if df is None or len(df) == 0:
         return None
-    tcol = "TIME_PERIOD" if "TIME_PERIOD" in df.columns else df.columns[-2]
-    vcol = "OBS_VALUE"  if "OBS_VALUE"  in df.columns else df.columns[-1]
-    s = pd.Series(
-        pd.to_numeric(df[vcol], errors="coerce").values,
-        index=pd.to_datetime(_normalize_periods(df[tcol].astype(str)), errors="coerce"),
-    )
-    s = s[~s.index.isna()].dropna().sort_index()
-    return s if len(s) else None
+    if not {"TIME_PERIOD", "OBS_VALUE"} <= set(df.columns):
+        raise ValueError("colonnes CSV BCE TIME_PERIOD/OBS_VALUE absentes")
+    return _observation_series(df["TIME_PERIOD"], df["OBS_VALUE"])
 
 
 def _parse_jsonstat(payload, select=None):
@@ -109,35 +150,51 @@ def _parse_jsonstat(payload, select=None):
     filtre de la requête.
     """
     if "value" not in payload or "dimension" not in payload:
-        return None
+        raise ValueError("réponse JSON-stat sans valeurs ou dimensions")
     dims = payload.get("id") or list(payload["dimension"].keys())
-    if "time" not in dims:
-        return None
+    time_dims = [d for d in dims if d.lower() in {"time", "time_period"}]
+    if len(time_dims) != 1 or len(set(dims)) != len(dims):
+        raise ValueError("dimension temporelle JSON-stat ambiguë ou absente")
+    time_dim = time_dims[0]
     sizes = payload.get("size") or [
         len(payload["dimension"][d]["category"]["index"]) for d in dims
     ]
+    if len(sizes) != len(dims) or any(type(n) is not int or n < 0 for n in sizes):
+        raise ValueError("dimensions JSON-stat incohérentes")
+    categories = {}
+    for d, size in zip(dims, sizes):
+        cat = payload["dimension"][d]["category"]["index"]
+        if isinstance(cat, list):
+            cat = {code: pos for pos, code in enumerate(cat)}
+        if len(cat) != size or sorted(cat.values()) != list(range(size)):
+            raise ValueError(f"positions JSON-stat incohérentes : {d}")
+        categories[d] = cat
 
     # strides du cube (row-major)
     strides = [1] * len(sizes)
     for i in range(len(sizes) - 2, -1, -1):
         strides[i] = strides[i + 1] * sizes[i + 1]
-    t_idx = dims.index("time")
-    t_stride, t_size = strides[t_idx], sizes[t_idx]
-    pos2time = {pos: lab for lab, pos
-                in payload["dimension"]["time"]["category"]["index"].items()}
+    t_idx = dims.index(time_dim)
+    t_stride = strides[t_idx]
+    pos2time = {pos: lab for lab, pos in categories[time_dim].items()}
 
     # position fixée pour chaque dimension hors-temps
     select = {k.lower(): v for k, v in (select or {}).items()}
+    if set(select) - {d.lower() for d in dims}:
+        raise ValueError("dimension demandée absente de la réponse JSON-stat")
     base = 0
     for i, d in enumerate(dims):
-        if d == "time":
+        if d == time_dim:
             continue
-        cat = payload["dimension"][d]["category"]["index"]  # {code: position}
-        if d.lower() in select and select[d.lower()] in cat:
+        cat = categories[d]
+        if d.lower() in select:
+            if select[d.lower()] not in cat:
+                raise ValueError(f"code demandé absent : {d}={select[d.lower()]}")
             base += cat[select[d.lower()]] * strides[i]
         elif sizes[i] == 1:
             base += next(iter(cat.values())) * strides[i]
-        # sinon : dimension multi-positions non sélectionnée -> position 0 (agrégat usuel)
+        else:
+            raise ValueError(f"dimension non sélectionnée ou vide : {d}")
 
     values = payload["value"]
     if isinstance(values, dict):
@@ -153,11 +210,7 @@ def _parse_jsonstat(payload, select=None):
     if not out:
         return None
 
-    s = pd.Series(out)
-    s.index = pd.to_datetime(_normalize_periods(s.index), errors="coerce")
-    s = pd.to_numeric(s, errors="coerce")
-    s = s[~s.index.isna()].dropna().sort_index()
-    return s if len(s) else None
+    return _observation_series(out.keys(), out.values())
 
 
 def _normalize_periods(idx):
@@ -176,7 +229,7 @@ def _normalize_periods(idx):
             out.append(f"{y}-{int(m):02d}-01")
         elif "W" in x and "-" in x:                   # 2024-W05  (hebdo, rare)
             y, w = x.split("-W")
-            out.append(f"{y}-{int(w):02d}-1-1" if False else f"{y}-01-01")
+            out.append(datetime.fromisocalendar(int(y), int(w), 1).date().isoformat())
         elif len(x) == 7 and "-" in x:                # 2024-03
             out.append(f"{x}-01")
         elif len(x) == 4 and x.isdigit():             # 2024 (annuel)
@@ -186,45 +239,12 @@ def _normalize_periods(idx):
     return out
 
 
-def _fetch_eurostat(dataset, filters, start=START):
-    """
-    Récupère une série Eurostat -> pd.Series indexée par date.
-
-    Stratégie : on envoie TOUS les filtres dans l'URL pour obtenir une réponse
-    compacte (les gros datasets comme une_rt_m renvoient sinon un 413 ou un JSON
-    d'erreur sans champ `value`). Repli geo-seul + sélection de cellule si jamais
-    l'API n'honore pas un filtre. Le parseur sélectionne de toute façon la bonne
-    cellule à partir de la structure réelle de la réponse.
-    """
-    def _request(params):
-        url = (f"{EUROSTAT_BASE}{dataset}?format=JSON&lang=EN"
-               f"&sinceTimePeriod={start[:4]}{params}")
-        r = requests.get(url, timeout=45, headers={"Accept": "application/json"})
-        r.raise_for_status()
-        return r.json()
-
-    # 1) tous les filtres -> réponse compacte
-    all_params = "".join(f"&{k}={v}" for k, v in filters.items())
-    s = None
-    try:
-        s = _parse_jsonstat(_request(all_params), select=filters)
-        if s is not None and len(s) >= 10:
-            return s
-    except Exception:  # noqa: BLE001 — on tentera le repli
-        s = None
-
-    # 2) repli : geo seul, borné dans le temps (lastTimePeriod) pour garantir une
-    #    réponse exploitable même sur un gros dataset -> sélection de cellule.
-    geo = filters.get("geo")
-    for params in (f"&geo={geo}&lastTimePeriod=480" if geo else "&lastTimePeriod=480",
-                   f"&geo={geo}" if geo else ""):
-        try:
-            s2 = _parse_jsonstat(_request(params), select=filters)
-            if s2 is not None and len(s2) >= 10:
-                return s2
-        except Exception:  # noqa: BLE001
-            continue
-    return s
+def _fetch_eurostat(dataset, filters, start=START, *, base=EUROSTAT_BASE):
+    """JSON-stat Eurostat/ECFIN : filtres exacts, aucun repli sur une autre série."""
+    params = {"format": "JSON", "lang": "EN", "sinceTimePeriod": start[:4], **filters}
+    response = _request(f"{base}{dataset}?{urlencode(params)}",
+                        headers={"Accept": "application/json"})
+    return _parse_jsonstat(response.json(), select=filters)
 
 
 def _normalized_day(value=None):
@@ -241,7 +261,11 @@ def _freshness_error(series, meta, as_of=None):
         return "réponse vide"
     last = _normalized_day(series.index[-1])
     today = _normalized_day(as_of)
-    age = max(0, (today - last).days)
+    age = (today - last).days
+    if age < 0:
+        return f"date source future : {last.date().isoformat()}"
+    if not np.isfinite(series.to_numpy()).all():
+        return "valeur non finie dans la série"
     limit = int(meta.get("max_age_days", FRESHNESS_DAYS.get(meta.get("freq", "M"), 105)))
     if age > limit:
         return (f"périmée : dernière observation {last.date().isoformat()} "
@@ -270,6 +294,8 @@ def fetch_all_series(progress=None, as_of=None):
                 s = _fetch_ecb(meta["key"])
             elif meta["source"] == "eurostat_sdmx":
                 s = _fetch_eurostat_sdmx(meta["dataset"], meta["key"])
+            elif meta["source"] == "ecfin":
+                s = _fetch_eurostat(meta["dataset"], meta["filters"], base=ECFIN_BASE)
             else:
                 s = _fetch_eurostat(meta["dataset"], meta["filters"])
             if s is not None and len(s) >= 10:

@@ -127,9 +127,11 @@ SERIES_CATALOG = {
         "SLOPE":     {"name": "Pente courbe 10Y−3M", "source": "computed",
                       "compute": ("DE10Y", "EURIBOR3M"), "scale": 100.0, "freq": "M",
                       "direction": "down", "unit": "pb"},
-        "EEI":       {"name": "Anticipations d'emploi (EEI)", "source": "eurostat",
-                      "dataset": "ei_bssi_m_r2",
-                      "filters": {"geo": "EA21", "indic": "BS-EEI-I", "s_adj": "SA"},
+        # DG ECFIN publie l'EEI pour son agrégat EA, pas dans ei_bssi_m_r2.
+        "EEI":       {"name": "Anticipations d'emploi (EEI)", "source": "ecfin",
+                      "dataset": "BCS_MAIN_INDICATORS",
+                      "filters": {"REF_AREA": "EA", "ACTIVITY": "TOT", "INDICATOR": "EEI",
+                                  "SEASONAL_ADJUST": "S", "FREQ": "M"},
                       "freq": "M", "direction": "down", "unit": "idx"},
     },
 
@@ -207,7 +209,7 @@ SERIES_CATALOG = {
         "RETAIL":    {"name": "Ventes de détail YoY", "source": "eurostat",
                       "dataset": "sts_trtu_m",
                       "filters": {"geo": "EA21", "nace_r2": "G47", "s_adj": "SCA",
-                                  "indic_bt": "TOVV", "unit": "I21"},
+                                  "indic_bt": "VOL_SLS", "unit": "I21"},
                       "freq": "M", "direction": "down", "unit": "%", "yoy": True},
         "CONS_CONF": {"name": "Confiance des consommateurs", "source": "eurostat",
                       "dataset": "ei_bsco_m",
@@ -234,7 +236,7 @@ SERIES_CATALOG = {
     "immobilier": {
         "HPI":       {"name": "Prix immobilier YoY", "source": "eurostat",
                       "dataset": "prc_hpi_q",
-                      "filters": {"geo": "EA21", "purchase": "TOTAL", "unit": "I15_NSA"},
+                      "filters": {"geo": "EA21", "purchase": "TOTAL", "unit": "I15_Q"},
                       "freq": "Q", "direction": "down", "unit": "%", "yoy": True},
     },
 }

@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import tempfile
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
@@ -29,6 +30,7 @@ from catalog import (
     visible_series_count,
 )
 from data import (
+    ECFIN_BASE,
     fetch_all_series, compute_dashboard, compute_predictive_power,
     apply_weights, family_scores, global_score, reconstruct_historical_score,
     status_color, regime_from_score,
@@ -94,6 +96,9 @@ def _source_url(meta):
         params = {"format": "JSON", "lang": "EN", **meta.get("filters", {})}
         return ("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
                 f"{meta['dataset']}?{urlencode(params)}")
+    if meta.get("source") == "ecfin":
+        params = {"format": "JSON", "lang": "EN", **meta["filters"]}
+        return f"{ECFIN_BASE}{meta['dataset']}?{urlencode(params)}"
     return "https://github.com/bluetouff/euro-macro-dashboard/blob/main/catalog.py"
 
 
@@ -110,8 +115,10 @@ def _atomic_write(path, content):
 
 
 def build():
-    print("Récupération BCE & Eurostat…")
-    raw, errors = fetch_all_series()
+    print("Récupération BCE, Eurostat & DG ECFIN…", flush=True)
+    raw, errors = fetch_all_series(progress=lambda _, message: print(message, flush=True))
+    for code, message in errors.items():
+        print(f"SOURCE_ERROR {code}: {message}", file=sys.stderr, flush=True)
     dashboard = compute_dashboard(raw)
     power = compute_predictive_power(raw)
     dashboard = apply_weights(dashboard, power)

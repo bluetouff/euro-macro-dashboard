@@ -24,6 +24,23 @@ class CatalogContractTest(unittest.TestCase):
     def test_unavailable_bankruptcy_series_is_not_in_catalog(self):
         self.assertNotIn("BANKRUPT", SERIES_CATALOG["credit_banques"])
 
+    def test_eei_uses_the_commission_employment_indicator(self):
+        meta = SERIES_CATALOG["avances"]["EEI"]
+        self.assertEqual(meta["source"], "ecfin")
+        self.assertEqual(meta["dataset"], "BCS_MAIN_INDICATORS")
+        self.assertEqual(meta["filters"], {
+            "REF_AREA": "EA", "ACTIVITY": "TOT", "INDICATOR": "EEI",
+            "SEASONAL_ADJUST": "S", "FREQ": "M",
+        })
+
+    def test_retail_and_house_prices_use_exact_units(self):
+        retail = SERIES_CATALOG["activite_reelle"]["RETAIL"]
+        hpi = SERIES_CATALOG["immobilier"]["HPI"]
+        self.assertEqual(retail["filters"]["indic_bt"], "VOL_SLS")
+        self.assertEqual(hpi["filters"]["unit"], "I15_Q")
+        self.assertTrue(retail["yoy"])
+        self.assertTrue(hpi["yoy"])
+
 
 if __name__ == "__main__":
     unittest.main()
