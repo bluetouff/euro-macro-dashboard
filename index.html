@@ -5,70 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
-<title>Euro Macro Risk</title>
+<meta name="description" content="Le radar macro de la zone euro par l0g : indicateurs BCE, Eurostat et DG ECFIN, sources datées et méthode publique.">
+<meta name="theme-color" content="#0c0d10">
+<title>Euro Macro Risk · l0g</title>
 <style>
   :root{
-    --bg:#1a1a1a; --panel:#202020; --panel2:#171717;
-    --line:rgba(0,240,208,.16); --line-soft:rgba(255,255,255,.10);
-    --txt:#b8fff5; --paper:#e7e9ee; --bright:#f5f6f8;
-    --mut:#6f9b94; --faint:#456b65; --accent:#00f0d0; --teal:#5eead4;
-    --yen:#ff6b9d; --rose:#ff4d87; --gold:#f5b13d; --orange:#ff8a3d;
+    color-scheme:dark;
+    --bg:#0c0d10; --panel:#121419; --panel2:#171a20;
+    --line:rgba(255,255,255,.10); --line-soft:rgba(255,255,255,.20);
+    --txt:#e7e9ee; --paper:#e7e9ee; --bright:#f5f6f8;
+    --mut:#8b909b; --faint:#8b909b; --accent:#5eead4; --teal:#5eead4;
+    --yen:#ff4d87; --rose:#ff4d87; --gold:#f5b13d; --orange:#ff8a3d;
     --ok:#5eead4; --warn:#f5b13d; --dang:#ff4d87;
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;}
   html{background:var(--bg);}
   body{background:radial-gradient(1100px 520px at 50% -8%,rgba(94,234,212,.05),transparent 62%),var(--bg);
-    color:var(--txt);margin:0;padding:20px 28px 40px;font-family:var(--mono);max-width:1220px;margin:0 auto;}
-  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
-    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.08) 3px);
-    mix-blend-mode:multiply;opacity:.42;}
+    color:var(--txt);padding:28px 28px 40px;font-family:var(--mono);line-height:1.6;
+    max-width:1220px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+  html::before{content:"";display:block;height:3px;
+    background:linear-gradient(90deg,var(--teal),var(--rose) 55%,var(--gold));}
   a{color:var(--teal);}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--teal);outline-offset:5px;border-radius:3px;}
+  .skip-link{position:absolute;left:16px;top:8px;transform:translateY(-160%);z-index:10;
+    background:var(--panel);padding:8px 12px;}
+  .skip-link:focus{transform:none;}
+  .masthead{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:8px 0 24px;}
+  .brand{display:inline-flex;align-items:center;gap:16px;color:var(--bright);text-decoration:none;min-width:0;}
+  .brand-mark{font-size:32px;font-weight:700;line-height:1;letter-spacing:-.04em;white-space:nowrap;}
+  .brand-zero{color:var(--teal);font-feature-settings:"zero";}
+  .brand-cursor{color:var(--rose);}
+  .brand-tag{border-left:1px solid var(--line-soft);padding-left:16px;font-size:11px;line-height:1.55;color:var(--mut);}
+  .brand-tag strong{display:block;font-weight:500;color:var(--teal);}
+  .home-link{display:inline-flex;align-items:center;justify-content:center;gap:10px;flex:none;
+    border:1px solid rgba(94,234,212,.4);border-radius:6px;padding:9px 13px;font-size:12px;text-decoration:none;}
+  .home-link:hover{background:rgba(94,234,212,.08);border-color:var(--teal);color:var(--bright);}
   .tape{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px 22px;border-bottom:1px solid var(--line);
-    padding-bottom:14px;margin-bottom:20px;}
-  .brand{color:var(--bright);font-size:1.15rem;font-weight:800;}
-  .brand b{color:var(--yen);}
-  .tagline{color:var(--mut);font-size:.72rem;letter-spacing:.03em;}
-  .top-nav{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto;align-items:center;}
-  .nav-link{color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:4px 10px;
-    font-size:.7rem;text-decoration:none;}
-  .nav-link:hover,.nav-link.active{color:var(--bright);border-color:rgba(94,234,212,.65);
-    background:rgba(94,234,212,.06);}
-  .status-pill{color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:4px 10px;
-    font-size:.7rem;display:flex;gap:8px;align-items:center;}
+    margin-bottom:28px;}
+  .top-nav{display:flex;flex-wrap:wrap;gap:24px;align-items:center;}
+  .nav-link{color:#a8adb8;border-bottom:2px solid transparent;padding:10px 0;margin-bottom:-1px;
+    font-size:12px;letter-spacing:.07em;text-transform:uppercase;text-decoration:none;}
+  .nav-link:hover,.nav-link.active{color:var(--bright);border-bottom-color:var(--teal);}
+  .status-pill{color:var(--mut);margin-left:auto;font-size:11px;display:flex;gap:8px;align-items:center;padding:8px 0;}
   .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
   .status-pill.needs-attention .status-dot{background:var(--gold);}
-  .title{font-size:24px;font-weight:800;margin:0;color:var(--bright);border-bottom:1px solid var(--line);
-    padding-bottom:8px;text-shadow:0 0 30px rgba(94,234,212,.18);}
-  .sub{color:var(--mut);font-size:12px;margin-top:9px;line-height:1.5;}
+  .eyebrow{color:var(--teal);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
+  .title{font-size:clamp(26px,4vw,42px);font-weight:700;line-height:1.2;letter-spacing:-.04em;
+    margin:0;color:var(--bright);text-shadow:0 0 30px rgba(94,234,212,.12);}
+  .intro{max-width:760px;color:var(--paper);font-size:14px;line-height:1.65;margin:12px 0 0;}
+  .sub{color:var(--mut);font-size:11px;margin-top:10px;line-height:1.6;}
   .hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:18px 0 16px;}
-  .stat{background:var(--panel);border:0;border-left:3px solid var(--accent);border-radius:0;padding:15px 16px;min-height:112px;}
-  .stat .lab{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;}
+    border:1px solid var(--line-soft);border-radius:8px;overflow:hidden;margin:24px 0 18px;}
+  .stat{background:var(--panel);border:0;border-top:2px solid var(--accent);border-radius:0;padding:18px 16px;min-height:128px;}
+  .stat .lab{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;line-height:1.6;}
   .stat .big{font-size:34px;font-weight:800;font-family:ui-monospace,'SF Mono',monospace;line-height:1.1;margin-top:2px;}
   .stat .big small{font-size:14px;color:var(--mut);font-weight:600;}
   .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:13px;font-weight:700;margin-top:6px;}
-  .dots{font-size:13px;font-family:ui-monospace,'SF Mono',monospace;margin-top:10px;color:var(--mut);}
+  .dots{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;margin-top:10px;color:var(--mut);}
+  .dots span{white-space:nowrap;}
+  .dots b{font-size:16px;font-weight:600;}
+  .reading-status{font-size:11px;margin-top:8px;}
   details{background:rgba(255,255,255,.018);border:1px solid var(--line);border-radius:10px;padding:0 14px;margin:10px 0;}
   details summary{cursor:pointer;padding:11px 0;font-size:13px;font-weight:600;color:var(--paper);list-style:none;}
   details summary::-webkit-details-marker{display:none;}
   details summary::before{content:'▸ ';color:var(--mut);}
   details[open] summary::before{content:'▾ ';}
   details .body{padding:4px 0 14px;font-size:12.5px;line-height:1.6;color:var(--mut);}
-  .sec{display:flex;align-items:center;gap:10px;margin:20px 0 10px;}
-  .sec .ic{font-size:13px;color:var(--yen);}
-  .sec .nm{font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;}
+  details .body code,details .body a{overflow-wrap:anywhere;}
+  .sec{display:flex;align-items:center;gap:10px;margin:28px 0 12px;}
+  .sec .ic{font-size:13px;color:var(--yen);flex:none;}
+  .sec .nm{font-size:12px;font-weight:600;color:var(--paper);text-transform:uppercase;letter-spacing:.06em;margin:0;}
   .sec .ln{flex:1;height:1px;background:var(--line);}
   .sec .bd{font-family:ui-monospace,'SF Mono',monospace;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px;}
-  .tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 13px 9px;position:relative;overflow:hidden;transition:.15s;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 14px 12px;position:relative;overflow:hidden;transition:.15s;}
   .tile:hover{border-color:rgba(94,234,212,.65);background:var(--panel2);}
   .tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);}
-  .tile .nm{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;line-height:1.25;min-height:25px;display:flex;gap:5px;}
+  .tile .nm{font-size:11px;color:#a8adb8;text-transform:uppercase;letter-spacing:.03em;line-height:1.4;min-height:30px;display:flex;gap:6px;}
   .tile .nm .d{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none;margin-top:3px;}
-  .tile .vl{font-size:21px;font-weight:700;font-family:ui-monospace,'SF Mono',monospace;color:var(--bright);line-height:1.1;margin-top:5px;}
+  .tile .vl{font-size:23px;font-weight:700;font-family:var(--mono);color:var(--bright);line-height:1.2;margin-top:8px;}
   .tile .vl u{font-size:11px;color:var(--mut);font-weight:600;text-decoration:none;margin-left:3px;}
-  .tile .mt{font-size:10px;font-family:ui-monospace,'SF Mono',monospace;color:var(--mut);margin-top:4px;}
+  .tile .mt{font-size:11px;font-family:var(--mono);color:var(--mut);margin-top:6px;}
   .tile .mt b{font-weight:700;}
   .tile svg.spark{display:block;width:100%;height:26px;margin-top:6px;}
   .alerts{display:flex;flex-wrap:wrap;gap:7px;}
@@ -78,7 +96,7 @@
   .muted{color:var(--mut);font-size:11px;}
   .ok-banner{background:rgba(94,234,212,.06);border:1px solid var(--line);color:var(--teal);border-radius:8px;padding:10px 14px;font-size:13px;}
   .quality-banner{background:rgba(245,177,61,.08);border:1px solid rgba(245,177,61,.42);color:var(--gold);border-radius:8px;padding:10px 14px;font-size:12px;margin:12px 0;}
-  .asof{display:flex;justify-content:space-between;gap:8px;margin-top:5px;color:var(--faint);font-size:9px;}
+  .asof{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;margin-top:8px;color:var(--mut);font-size:10px;}
   .asof a{color:var(--mut);text-decoration:none;}
   .asof a:hover{color:var(--teal);}
   .help-card{background:rgba(255,255,255,.018);border:1px solid var(--line);border-left:2px solid var(--teal);
@@ -88,32 +106,54 @@
   .faq-card{background:rgba(255,255,255,.018);border:1px solid var(--line);border-radius:8px;
     padding:14px 15px;min-height:128px;color:var(--mut);font-size:.82rem;line-height:1.52;}
   .faq-card strong{color:var(--paper);display:block;margin-bottom:6px;}
-  .site-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;
-    margin-top:34px;padding:18px 0 6px;border-top:1px solid var(--line);color:var(--faint);font-size:.72rem;}
-  .l0g-logo{display:inline-flex;align-items:baseline;gap:2px;color:var(--bright);font-weight:800;text-decoration:none;letter-spacing:0;}
-  .l0g-logo .slash{color:var(--teal);}
-  .l0g-logo:hover{color:var(--teal);}
-  .chart-shell svg{border:1px solid var(--line);}
+  .site-footer{margin-top:40px;padding:24px 0 6px;border-top:1px solid var(--line);color:var(--mut);font-size:11px;}
+  .footer-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;}
+  .footer-nav{display:flex;flex-wrap:wrap;gap:10px 20px;}
+  .footer-nav a{text-decoration:none;}
+  .footer-nav a:hover{text-decoration:underline;text-underline-offset:4px;}
+  .footer-note{margin:16px 0 0;line-height:1.8;}
+  .chart-shell svg{display:block;border:1px solid var(--line);}
+  @media (max-width:900px){.hero{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media (max-width:640px){
     body{padding:16px 14px 30px;}
-    .title{font-size:20px;}
+    .masthead{gap:12px;padding-bottom:20px;}
+    .brand-tag{display:none;}
+    .home-link{font-size:11px;padding:8px 10px;}
     .stat .big{font-size:28px;}
-    .hero,.faq-grid{grid-template-columns:1fr;}
-    .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:7px;}
-    .top-nav{margin-left:0;}
+    .hero{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .stat{min-height:120px;padding:13px 12px;}
+    .faq-grid{grid-template-columns:1fr;}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+    .tile{padding:12px 11px 10px;}
+    .tile .vl{font-size:21px;}
+    .tile .nm{min-height:46px;overflow-wrap:anywhere;}
+    .top-nav{gap:20px;}
+    .tape{gap:0;}
+    .status-pill{width:100%;margin-left:0;padding:10px 0;}
+    .sec .ln{min-width:8px;}
+    .sec .bd{flex:none;}
   }
+  @media (max-width:360px){.hero,.grid{grid-template-columns:1fr;}.tile .nm{min-height:0;}}
 </style>
 </head>
 <body>
-<div id="app"><p class="muted">Chargement de l'instantané…</p></div>
+<a class="skip-link" href="#app">Aller au tableau de bord</a>
+<header class="masthead">
+  <a class="brand" href="https://l0g.fr/" aria-label="l0g, accueil">
+    <span class="brand-mark" aria-hidden="true">l<span class="brand-zero">0</span>g<span class="brand-cursor">_</span></span>
+    <span class="brand-tag" aria-hidden="true"><strong>Lire les mécanismes</strong>avant qu’ils deviennent l’événement</span>
+  </a>
+  <a class="home-link" href="https://l0g.fr/"><span aria-hidden="true">↗</span> Retour à l0g.fr</a>
+</header>
+<main id="app" tabindex="-1"><p class="muted">Chargement de l'instantané…</p></main>
+<noscript><p>Activez JavaScript pour lire le tableau de bord. Les <a href="snapshot.json">données datées</a> restent accessibles.</p></noscript>
 
 <script src="snapshot.js"></script>
 <script>
 (function(){
   const S = window.SNAPSHOT;
   const app = document.getElementById('app');
-  if(!S){ app.innerHTML = "<p class='muted'>Aucun instantané trouvé. Lancez "+
-    "<code>python build_snapshot.py</code> pour générer <code>snapshot.js</code>.</p>"; return; }
+  if(!S){ app.innerHTML = "<h1 class='title'>Euro Macro Risk</h1><p class='quality-banner' role='status'>L’instantané est indisponible. Vous pouvez consulter les <a href='https://l0g.fr/maintenant/'>signaux et leurs dates sur l0g.fr</a>.</p>"; return; }
 
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function fmt(v){
@@ -123,7 +163,6 @@
     if(a>=1)    return v.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
     return v.toLocaleString('fr-FR',{minimumFractionDigits:3,maximumFractionDigits:3});
   }
-  const emoji = {ok:'🟢',warning:'🟡',danger:'🔴',unknown:'⚪'};
   const params = new URLSearchParams(window.location.search);
   const view = ['faq','help','aide'].includes((params.get('view')||'').toLowerCase()) ? 'faq' : 'radar';
 
@@ -152,28 +191,28 @@
   function header(){
     const radar = view === 'radar' ? 'active' : '';
     const faq = view === 'faq' ? 'active' : '';
-    return "<header class='tape'>"+
-      "<div class='brand'><b>Euro</b> Macro <b>Risk</b></div>"+
-      "<div class='tagline'>"+esc(S.scope||'Zone euro · composition courante')+" · BCE · Eurostat</div>"+
-      "<nav class='top-nav' aria-label='Navigation'>"+
-        "<a class='nav-link "+radar+"' href='?'>Radar</a>"+
-        "<a class='nav-link "+faq+"' href='?view=faq'>Aide / FAQ</a>"+
+    return "<div class='tape'>"+
+      "<nav class='top-nav' aria-label='Navigation Euro Macro'>"+
+        "<a class='nav-link "+radar+"'"+(radar?" aria-current='page'":"")+" href='?'>Radar Euro</a>"+
+        "<a class='nav-link "+faq+"'"+(faq?" aria-current='page'":"")+" href='?view=faq'>Aide / FAQ</a>"+
       "</nav>"+
-      "<div id='snapshot-status' class='status-pill'><span class='status-dot'></span>"+esc(S.generated_at)+"</div>"+
-    "</header><div id='snapshot-freshness' class='quality-banner' role='status' hidden></div>";
+      "<div id='snapshot-status' class='status-pill'><span class='status-dot' aria-hidden='true'></span>Collecte · "+esc(S.generated_at)+"</div>"+
+    "</div><div id='snapshot-freshness' class='quality-banner' role='status' hidden></div>";
   }
 
   function footer(){
-    return "<div class='site-footer'>"+
-      "<a class='l0g-logo' href='https://l0g.fr' target='_blank' rel='noopener' aria-label='l0g.fr'>"+
-        "<span class='slash'>//</span><span>l0g.fr</span></a>"+
-      "<span>Euro Macro Risk · MIT License · révision "+esc((S.source_sha||'n/a').slice(0,12))+"</span>"+
-    "</div>";
+    return "<footer class='site-footer'><div class='footer-top'>"+
+      "<a class='brand' href='https://l0g.fr/' aria-label='l0g, accueil'><span class='brand-mark' aria-hidden='true'>l<span class='brand-zero'>0</span>g<span class='brand-cursor'>_</span></span></a>"+
+      "<nav class='footer-nav' aria-label='Explorer l0g'>"+
+        "<a href='https://l0g.fr/'>Analyses l0g.fr ↗</a>"+
+        "<a href='https://l0g.fr/maintenant/#signal-eu'>Tous les signaux</a>"+
+        "<a href='https://l0g.fr/methodologie/'>Méthodologie l0g</a>"+
+      "</nav></div><p class='footer-note'>Euro Macro Risk · un outil de l0g · sources publiques, dates et limites visibles.<br>Information uniquement, aucun conseil d’investissement. MIT License · révision "+esc((S.source_sha||'n/a').slice(0,12))+"</p></footer>";
   }
 
   function faqPage(){
     return header()+
-      "<div class='title'>Aide / FAQ</div>"+
+      "<div class='eyebrow'>// l0g · méthode &amp; sources</div><h1 class='title'>Aide / FAQ</h1>"+
       "<div class='help-card'><strong>Objectif.</strong> Euro Macro Risk agrège des séries publiques BCE et Eurostat pour surveiller le régime macro de la zone euro. L'outil ne prédit pas une récession et ne donne pas de conseil d'investissement : il aide à savoir quels canaux lire en premier.</div>"+
       "<div class='faq-grid'>"+
         "<div class='faq-card'><strong>Périmètre</strong> Le dashboard suit la composition courante de la zone euro, soit EA21 depuis le 1er janvier 2026. L'agrégat Eurostat évolutif EA n'est utilisé que lorsque le jeu de données le définit ainsi.</div>"+
@@ -210,19 +249,20 @@
   const c=S.counts, r=S.regime;
   const regimeColor = scoreColor(S.global_score);
   let html = header()+
-    "<div class='title'>Euro Macro Risk</div>"+
-    "<div class='sub'>BCE + Eurostat · "+c.total+" indicateurs · MAJ "+esc(S.generated_at)+
-      " · backtest récessions CEPR</div>"+
+    "<div class='eyebrow'>// l0g · radar macro · zone euro</div>"+
+    "<h1 class='title'>Euro Macro <span style='color:var(--teal)'>Risk</span></h1>"+
+    "<p class='intro'>Suivre les tensions de la zone euro, des taux à l’activité réelle. Chaque indicateur garde sa date et son lien vers la source.</p>"+
+    "<div class='sub'>"+esc(S.scope||'Zone euro · composition courante')+" · "+c.total+" indicateurs · BCE / Eurostat / DG ECFIN · récessions CEPR</div>"+
     "<div class='hero'>"+
-      "<div class='stat' style='border-left-color:"+regimeColor+"'><div class='lab'>Score de risque global</div>"+
+      "<div class='stat' style='border-top-color:"+regimeColor+"'><div class='lab'>Score de risque global</div>"+
         "<div class='big' style='color:"+regimeColor+"'>"+fmt(S.global_score)+"<small>/100</small></div></div>"+
-      "<div class='stat' style='border-left-color:"+regimeColor+"'><div class='lab'>Régime macro</div>"+
+      "<div class='stat' style='border-top-color:"+regimeColor+"'><div class='lab'>Régime macro</div>"+
         "<span class='pill' style='background:"+regimeColor+"22;color:"+regimeColor+";border:1px solid "+regimeColor+"55'>"+
         esc(r.label)+"</span></div>"+
-      "<div class='stat' style='border-left-color:"+(S.ciss?statusColor(S.ciss.status):'var(--faint)')+"'><div class='lab'>New CISS · stress systémique BCE</div>"+
-        (S.ciss?("<div class='big' style='color:"+statusColor(S.ciss.status)+"'>"+fmt(S.ciss.value)+" "+emoji[S.ciss.status]+"</div>"):"<div class='muted'>n/d</div>")+"</div>"+
-      "<div class='stat' style='border-left-color:var(--teal)'><div class='lab'>État des "+c.total+" indicateurs</div>"+
-        "<div class='dots'>🟢 "+c.ok+"&nbsp;&nbsp;🟡 "+c.warn+"&nbsp;&nbsp;🔴 "+c.dang+"</div></div>"+
+      "<div class='stat' style='border-top-color:"+(S.ciss?statusColor(S.ciss.status):'var(--faint)')+"'><div class='lab'>New CISS · stress systémique BCE</div>"+
+        (S.ciss?("<div class='big' style='color:"+statusColor(S.ciss.status)+"'>"+fmt(S.ciss.value)+"</div><div class='reading-status' style='color:"+statusColor(S.ciss.status)+"'>"+statusLabel(S.ciss.status)+"</div>"):"<div class='muted'>n/d</div>")+"</div>"+
+      "<div class='stat' style='border-top-color:var(--teal)'><div class='lab'>État des "+c.total+" indicateurs</div>"+
+        "<div class='dots'><span><b style='color:var(--ok)'>"+c.ok+"</b> normaux</span><span><b style='color:var(--warn)'>"+c.warn+"</b> en tension</span><span><b style='color:var(--dang)'>"+c.dang+"</b> en alerte</span></div></div>"+
     "</div>";
 
   if(S.quality && S.quality.status!=='ok'){
@@ -232,7 +272,7 @@
 
   // ---------- LÉGENDE ----------
   html +=
-    "<details><summary>ℹ️ Comment lire ce tableau de bord</summary><div class='body'>"+
+    "<details><summary>Comment lire ce tableau de bord</summary><div class='body'>"+
     "<b>Score global 0-100</b> : agrégation à pondération heuristique (corrélation historique "+
     "avec l'état de récession CEPR à +6 mois, sans validation hors échantillon). 🟩 &lt;45 Risk-On · ⬜ 45-55 Neutre · 🟧 55-70 Prudence · 🟥 &gt;70 Stress.<br>"+
     "<b>Couleur d'un indicateur</b> = z-score signé (écart à sa moyenne 5 ans, orienté risque) : "+
@@ -243,12 +283,12 @@
     "</div></details>";
 
   // ---------- ALERTES ----------
-  html += "<div class='sec'><span class='ic'>⚠️</span><span class='nm'>Signaux d'alerte</span><span class='ln'></span></div>";
+  html += "<div class='sec'><span class='ic' aria-hidden='true'>//</span><h2 class='nm'>Signaux d'alerte</h2><span class='ln'></span></div>";
   if(S.alerts && S.alerts.length){
     html += "<div class='alerts'>";
     S.alerts.forEach(a=>{
       const color = statusColor(a.status);
-      html += "<div class='al' style='--c:"+color+"'>"+emoji[a.status]+
+      html += "<div class='al' style='--c:"+color+"'><span class='status-dot' style='background:"+color+"' aria-hidden='true'></span>"+
         "<span class='an'>"+esc(a.name)+"</span>"+
         "<span class='av' style='color:"+color+"'>"+fmt(a.value)+" · z"+sgn(a.z)+"</span></div>";
     });
@@ -258,15 +298,15 @@
   }
 
   // ---------- HISTORIQUE ----------
-  html += "<details><summary>📈 Score composite historique vs récessions (CEPR)</summary><div class='body'>"+
+  html += "<details><summary>Score composite historique vs récessions (CEPR)</summary><div class='body'>"+
           "<div class='chart-shell'>"+histChart()+"</div><div class='muted'>Zones rouges = récessions CEPR. Un score &gt;55 avant/pendant "+
           "ces zones fournit une lecture rétrospective, pas une validation prospective.</div></div></details>";
 
   // ---------- FAMILLES ----------
   S.families.forEach(f=>{
     const familyColor = scoreColor(f.score);
-    html += "<div class='sec'><span class='ic'>"+f.icon+"</span><span class='nm'>"+esc(f.label)+
-      "</span><span class='ln'></span><span class='bd' style='background:"+familyColor+"22;color:"+familyColor+
+    html += "<div class='sec'><span class='ic' aria-hidden='true'>//</span><h2 class='nm'>"+esc(f.label)+
+      "</h2><span class='ln'></span><span class='bd' style='background:"+familyColor+"22;color:"+familyColor+
       "'>"+fmt(f.score)+"</span></div><div class='grid'>";
     f.indicators.forEach(d=>{
       const tileColor = statusColor(d.status);
@@ -294,7 +334,7 @@
     (errSources[k]?" · <a href='"+esc(errSources[k])+"' target='_blank' rel='noopener'>source</a>":"")+"<br>"); }
   else { diag += "<span style='color:#5eead4'>Toutes les séries du catalogue ont été récupérées.</span><br>"; }
   diag += "<span class='muted'>© European Central Bank (ECB Data Portal), Eurostat &amp; DG ECFIN · CISS © ECB · récessions CEPR-EABCN.</span>";
-  html += "<details><summary>⚙️ Diagnostic des sources</summary><div class='body'>"+diag+"</div></details>";
+  html += "<details><summary>Diagnostic des sources</summary><div class='body'>"+diag+"</div></details>";
   html += footer();
 
   app.innerHTML = html;
@@ -303,12 +343,13 @@
   // ---------- helpers ----------
   function sgn(v,dec){ if(v===null||v===undefined) return 'n/a';
     dec = (dec===undefined?2:dec); return (v>=0?'+':'')+v.toFixed(dec); }
-  function statusColor(s){ return {ok:'#5eead4',warning:'#f5b13d',danger:'#ff4d87'}[s]||'#456b65'; }
+  function statusColor(s){ return {ok:'#5eead4',warning:'#f5b13d',danger:'#ff4d87'}[s]||'#8b909b'; }
+  function statusLabel(s){ return {ok:'Normal',warning:'Tension',danger:'Alerte'}[s]||'Indisponible'; }
   function scoreColor(score){
-    if(score === null || score === undefined || Number.isNaN(score)) return '#456b65';
+    if(score === null || score === undefined || Number.isNaN(score)) return '#8b909b';
     if(score >= 70) return '#ff4d87';
     if(score >= 55) return '#f5b13d';
-    if(score >= 45) return '#6f9b94';
+    if(score >= 45) return '#8b909b';
     return '#5eead4';
   }
   function histChart(){
@@ -319,7 +360,7 @@
       ym.forEach((m,i)=>{const diff=Math.abs(monthNum(m)-monthNum(k)); if(diff<bd){bd=diff;b=i;}}); return b; };
     const x = i => pad + (i/(H.length-1))*(W-2*pad);
     const y = v => Ht-pad - (v/100)*(Ht-2*pad);
-    let svg = "<svg viewBox='0 0 "+W+" "+Ht+"' preserveAspectRatio='none' style='width:100%;height:240px;background:#1a1a1a;border-radius:8px'>";
+    let svg = "<svg viewBox='0 0 "+W+" "+Ht+"' preserveAspectRatio='none' style='width:100%;height:auto;background:var(--panel);border-radius:6px' role='img' aria-label='Historique du score composite et périodes de récession CEPR'>";
     // recession bands
     (S.recessions||[]).forEach(p=>{
       const x0=x(idxOf(p[0])), x1=x(idxOf(p[1]));
